@@ -125,6 +125,7 @@ feature -- Button texts
 	b_Total_time: STRING_32						do Result := locale.translation("Total Time")	end
 	b_Up_text: STRING_32 						do Result := locale.translation("Up")	end
 	b_Update: STRING_32 							do Result := locale.translation("Update")	end
+	b_Clean_compile: STRING_32					do Result := locale.translation("Compile from scratch")	end
 	b_Compile: STRING_32							do Result := locale.translation("Compile")	end
 	b_Launch: STRING_32							do Result := locale.translation("Start")	end
 	b_Restart: STRING_32							do Result := locale.translation("Restart") end
@@ -267,6 +268,7 @@ feature -- Button texts
 	b_Disable_catcall_console_warnings: STRING_32	do Result := locale.translation ("Disable Catcall Console Warning?") end
 	b_Disable_catcall_debugger_warnings: STRING_32	do Result := locale.translation ("Disable Catcall Debugger Warning?") end
 	b_import_settings: STRING_32	do Result := locale.translation ("Import Settings") end
+	b_try_it_now: STRING_32 do Result := locale.translation ("Try it now!") end
 
 feature -- Choices
 
@@ -466,6 +468,7 @@ feature -- Accelerator, focus label and menu name
 	m_Close_all_empty_tabs: STRING_32	do Result := locale.translation ("Close All Empty Tabs") end
 	m_Close_short: STRING_32				do Result := locale.translation("&Close")	end
 	m_Close_tab: STRING_32				do Result := locale.translation ("Close") end
+	m_reload_tab: STRING_32				do Result := locale.translation ("Reload") end
 
 	f_Create_new_cluster: STRING_32		do Result := locale.translation("Add a cluster")	end
 	f_Create_new_library: STRING_32		do Result := locale.translation("Add a library")	end
@@ -647,6 +650,12 @@ feature -- Accelerator, focus label and menu name
 	m_lock_docking_editor: STRING_32		do Result := locale.translation ("Lock the Editors") end
 	f_match_case_question: STRING_32		do Result := locale.translation("Match case?")	end
 	f_Melt: STRING_32					do Result := locale.translation("Compile current project")	end
+	h_clean_compile: STRING_32
+		do
+			Result := locale.translation("Compile from scratch is not needed in ordinary work with EiffelStudio, and is only useful to enable EiffelStudio to recover from an internal error.%NCompile from scratch erases all compiler-generated information about your project.%NDo you wish to continue?")
+		end
+	f_clean_compile: STRING_32					do Result := locale.translation("Compile current project from scratch")	end
+	m_clean_compile: STRING_32		do Result := locale.translation("Compile from scratch")	end
 	m_Melt_new: STRING_32				do Result := locale.translation("&Compile")	end
 	m_New: STRING_32						do Result := locale.translation("&New")	end
 	l_new_name: STRING_32				do Result := locale.translation("New Name:")	end
@@ -790,7 +799,7 @@ feature -- Accelerator, focus label and menu name
 	f_show: STRING_32 do Result := locale.translation ("Show ") end
 	f_hide: STRING_32 do Result := locale.translation ("Hide ") end
 	f_switch_to_tree_view: STRING_32		do Result := locale.translation ("Switch to Tree View") end
-	f_switch_to_flat_view: STRING_32 	do Result := locale.translation ("Switch to Flat View") end
+	f_switch_to_search_view: STRING_32 	do Result := locale.translation ("Switch to search mode") end
 	l_choose_class_version: STRING_32	do Result := locale.translation ("Choose one version from the following:") end
 	m_restart_application: STRING_32		do Result := locale.translation ("Restart application") end
 	f_restart_application: STRING_32		do Result := locale.translation ("Restart application") end
@@ -1173,7 +1182,7 @@ feature -- Label texts
 	l_Available_features: STRING_32		do Result := locale.translation("Available features:")	end
 	l_Basic_application: STRING_32		do Result := locale.translation("Basic application (no graphics library included)")	end
 	l_Basic_text: STRING_32				do Result := locale.translation("Basic text view")	end
-	l_building_flat_view: STRING_32		do Result := locale.translation ("Building flat view ...") end
+	l_building_search_view: STRING_32		do Result := locale.translation ("Building search view ...") end
 	l_building_tree_view: STRING_32		do Result := locale.translation ("Building tree view ...") end
 	l_capture: STRING_32 				do Result := locale.translation ("Capture") end
 	l_Callers: STRING_32					do Result := locale.translation("Callers")	end
@@ -1456,6 +1465,7 @@ feature -- Label texts
 	l_finish_to_generate: STRING_32 		do Result := locale.translation("Click `Finish' to generate the documentation.")	end
 	l_first_chance: STRING_32 			do Result := locale.translation ("First chance") end
 	l_Flat_view: STRING_32				do Result := locale.translation ("Flat view") end
+	l_search_view: STRING_32				do Result := locale.translation ("Search...") end
 	l_Flatshort: STRING_32				do Result := locale.translation("Interface view")	end
 	l_found: STRING_32 					do Result := locale.translation ("Found") end
 	l_freeze: STRING_32					do Result := locale.translation("Freeze")	end
@@ -1728,6 +1738,7 @@ feature -- Label texts
 	l_Tab_feature_info: STRING_32 		do Result := locale.translation("Feature")	end
 	l_Tab_diagram: STRING_32 			do Result := locale.translation("Diagram")	end
 	l_target: STRING_32					do Result := locale.translation("Target")	end
+	l_target_colon_space: STRING_32					do Result := locale.translation("Target: ")	end
 	l_target_does_not_exist (a_target: READABLE_STRING_GENERAL): STRING_32
 		require
 			a_target_not_void: a_target /= Void
@@ -1758,7 +1769,7 @@ feature -- Label texts
 
 	l_there_is_already_a_class_with_the_same_name: STRING_32 do Result := locale.translation("There is already a class with the same name.")	end
 	l_Three_dots: STRING_32				do Result := locale.translation("...")	end
-	l_tree_or_flat_view: STRING_32		do Result := locale.translation ("Tree/Flat View") end
+	l_tree_or_search_view: STRING_32	do Result := locale.translation ("Tree/Search View") end
 	l_Tree_view: STRING_32				do Result := locale.translation ("Tree View") end
 	l_true: STRING_32					do Result := locale.translation ("True") end
 	l_try_saving_file_and_searching: STRING_32 	do Result := locale.translation ("Item expires. Try saving file and searching again.") end
@@ -1912,6 +1923,11 @@ feature -- Label texts
 	l_feature_has_rescue_clause: STRING_32
 		do
 			Result := locale.translation ("%N   + feature has a rescue clause")
+		end
+
+	l_feature_is_class: STRING_32
+		do
+			Result := locale.translation ("%N   + is a class feature")
 		end
 
 	l_module_is (a_module: READABLE_STRING_GENERAL): STRING_32
@@ -2081,6 +2097,7 @@ feature -- Label texts
 	h_show_feature_from_any: STRING_32  do Result := locale.translation("Show unchanged features from class ANY?")	end
 	h_show_tooltip: STRING_32 do Result := locale.translation("Show tooltips?")	end
 	h_show_item_location: STRING_32 do Result := locale.translation("Show class location?")	end
+	h_show_item_description: STRING_32 do Result := locale.translation("Show class description?")	end
 	l_class_browser_classes: STRING_32 do Result := locale.translation_in_context ("Class", "eiffelstudio.formatter.column_name")	end
 	l_class_browser_Path: STRING_32 do Result := locale.translation("Path")	end
 	l_class_browser_features: STRING_32 do Result := locale.translation_in_context ("Feature", "eiffelstudio.formatter.column_name")	end
@@ -2229,8 +2246,8 @@ feature -- Label texts
 	l_go_to_next_warning: STRING_32 			do Result := locale.translation ("Go to next warning") end
 	l_go_to_previous_warning: STRING_32 		do Result := locale.translation ("Go to previous warning") end
 
-	l_always_acknowledge_without_asking: STRING	do Result := locale.translation ("always acknowledge without asking.") end
-	l_always_compile_before_debug:STRING_32 	do Result := locale.translation ("always compile before executing.") end
+	l_always_acknowledge_without_asking: STRING_32 do Result := locale.translation ("always acknowledge without asking.") end
+	l_always_compile_before_debug:STRING_32 do Result := locale.translation ("always compile before executing.") end
 	l_always_delete_without_asking:STRING_32 do Result := locale.translation ("always delete without asking.") end
 
 	l_show_help:STRING_32 					do Result := locale.translation ("Show Help...") end
@@ -2257,9 +2274,25 @@ feature -- Label texts
 					]"), [a_version_name])
 		end
 
+	l_update_manager_estudio_beta_help (a_version_name: READABLE_STRING_GENERAL): STRING_32
+		do
+			Result := locale.formatted_string (locale.translation ("[
+				A new beta version of EiffelStudio is available: $1. This is an unstable version released towards the official one.
+					]"), [a_version_name])
+		end
 
-	l_show_features: STRING_32 	do Result := locale.translation ("Show Features (Ctrl+Space)") end
-	l_show_templates: STRING_32 do Result := locale.translation ("Show Templates (Ctrl+Space)") end
+
+	l_update_manager_estudio_stable_help (a_version_name: READABLE_STRING_GENERAL): STRING_32
+		do
+			Result := locale.formatted_string (locale.translation ("[
+				A newer version of EiffelStudio is available: $1. This is the stable version that superseeds the installed one.
+					]"), [a_version_name])
+		end
+
+
+	l_show_features: STRING_32 	do Result := locale.translation ("Show Features") end
+	l_show_templates: STRING_32 do Result := locale.translation ("Show Templates") end
+	l_show_symbols: STRING_32 do Result := locale.translation ("Show Symbols") end
 
 feature -- Label text, no translation (for the editor)
 
@@ -2923,6 +2956,14 @@ feature -- Description texts
 	e_Operation_succeeded: STRING_32	do Result := locale.translation("Operation succeeded.")	end
 	e_Operation_failed: STRING_32	do Result := locale.translation("Operation failed.") end
 
+	e_Insert_symbol: STRING_32	do Result := locale.translation("Insert symbol") end
+
+	f_insert_symbol: STRING_32 	do Result := locale.translation("Insert Symbol")	end
+
+	m_insert_symbol: STRING_32 	do Result := locale.translation("&Insert Symbol")	end
+
+	b_insert_symbol: STRING_32	do Result := locale.translation("Insert Symbol")	end
+
 feature -- Error
 
 	err_error: STRING_32 do Result := locale.translation ("Error ") end
@@ -3028,7 +3069,7 @@ feature -- String escape
 		end
 
 note
-	copyright: "Copyright (c) 1984-2018, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

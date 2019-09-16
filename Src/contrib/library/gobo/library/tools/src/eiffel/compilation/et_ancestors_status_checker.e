@@ -8,7 +8,7 @@ note
 	]"
 
 	library: "Gobo Eiffel Tools Library"
-	copyright: "Copyright (c) 2007-2016, Eric Bezault and others"
+	copyright: "Copyright (c) 2007-2019, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -23,8 +23,8 @@ inherit
 		end
 
 	ET_AST_NULL_PROCESSOR
-		undefine
-			make
+		rename
+			make as make_ast_processor
 		redefine
 			process_class
 		end
@@ -35,10 +35,10 @@ create
 
 feature {NONE} -- Initialization
 
-	make
+	make (a_system_processor: like system_processor)
 			-- Create a new ancestor builder status checker for given classes.
 		do
-			precursor {ET_CLASS_PROCESSOR}
+			precursor (a_system_processor)
 			create class_type_checker.make
 		end
 
@@ -63,7 +63,7 @@ feature -- Processing
 					-- Internal error (recursive call)
 					-- This internal error is not fatal.
 				error_handler.report_giaaa_error
-				create a_processor.make
+				create a_processor.make (system_processor)
 				a_processor.process_class (a_class)
 			elseif a_class.is_unknown then
 				set_fatal_error (a_class)
@@ -114,7 +114,7 @@ feature {NONE} -- Processing
 		do
 			old_class := current_class
 			current_class := a_class
-			if current_class.ancestors_built and then current_class.has_ancestors_error then
+			if current_class.has_ancestors_error then
 					-- The class has been marked with an ancestors error to indicate that we
 					-- need to check whether its ancestor tables need to be rebuilt or not.
 					-- It might happen if other classes on which it depends have been
@@ -165,16 +165,22 @@ feature {NONE} -- Formal parameters and parents validity
 			-- has been modified.
 		local
 			i, nb: INTEGER
+			j, nb2: INTEGER
 		do
 			if current_class.ancestors_built then
 				if attached current_class.formal_parameters as l_parameters then
 					nb := l_parameters.count
 					from i := 1 until i > nb loop
 						if attached l_parameters.formal_parameter (i).constraint as l_constraint then
-							class_type_checker.check_type_validity (l_constraint)
-							if class_type_checker.has_fatal_error then
-								set_fatal_error (current_class)
-								i := nb + 1 -- Jump out of the loop.
+							nb2 := l_constraint.count
+							from j := 1 until j > nb2 loop
+								class_type_checker.check_type_validity (l_constraint.type_constraint (j).type)
+								if class_type_checker.has_fatal_error then
+									set_fatal_error (current_class)
+									j := nb2 -- Jump out of the inner loop.
+									i := nb -- Jump out of the outer loop.
+								end
+								j := j + 1
 							end
 						end
 						i := i + 1

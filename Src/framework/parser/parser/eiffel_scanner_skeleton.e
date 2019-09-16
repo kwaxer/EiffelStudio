@@ -46,11 +46,8 @@ feature {NONE} -- Initialization
 
 	make
 			-- Create a new Eiffel scanner using default factory for creating AST nodes.
-		local
-			l_factory: AST_FACTORY
 		do
-			create l_factory
-			make_with_factory (l_factory)
+			make_with_factory (create {AST_FACTORY})
 		end
 
 	make_with_factory (a_factory: AST_FACTORY)
@@ -195,6 +192,9 @@ feature -- Access
 	has_syntax_warning: BOOLEAN
 			-- Do we create SYNTAX_WARNING instances for obsolte syntactical constructs?
 
+	is_warning_as_error: BOOLEAN
+			-- Should syntax warnings be reported as errors?
+
 	Maximum_string_character_code: NATURAL_32 = 0x10FFFF
 			-- Maximum value for character code inside a string
 			-- According to ISO/IEC 10646, the maximum Unicode point is 10FFFF.
@@ -274,7 +274,7 @@ feature -- Comparison
 				end
 			end
 		ensure
-			definition: Result = (text.same_string (a_text))
+			definition: Result = text.same_string (a_text)
 		end
 
 feature {NONE} -- Status
@@ -324,6 +324,14 @@ feature -- Settings
 			has_syntax_warning_set: has_syntax_warning = b
 		end
 
+	set_warning_as_error (b: BOOLEAN)
+			-- Set `is_warning_as_error` to `b`.
+		do
+			is_warning_as_error := b
+		ensure
+			is_warning_as_error = b
+		end
+
 	set_syntax_version (a_version: like syntax_version)
 			-- Set `syntax_version' to `a_version'.
 		require
@@ -364,7 +372,7 @@ feature {NONE} -- Error handling
 			a_error_not_void: a_error /= Void
 		do
 			a_error.set_associated_class (current_class)
-			error_handler.insert_warning (a_error)
+			error_handler.insert_warning (a_error, is_warning_as_error)
 		end
 
 	fatal_error (a_message: STRING)
@@ -461,7 +469,7 @@ feature {AST_FACTORY} -- Error handling
 			report_one_error (create {VIIN}.make (line, column, filename, ""))
 		end
 
-	report_invalid_type_for_real_error (a_type: TYPE_AS; a_real: STRING)
+	report_invalid_type_for_real_error (a_type: TYPE_AS; a_real: READABLE_STRING_8)
 			-- Error when an incorrect type `a_type' is specified for a real constant `a_real'.
 		require
 			a_type_not_void: a_type /= Void
@@ -475,7 +483,7 @@ feature {AST_FACTORY} -- Error handling
 			report_one_error (an_error)
 		end
 
-	report_invalid_type_for_integer_error (a_type: TYPE_AS; an_int: STRING)
+	report_invalid_type_for_integer_error (a_type: TYPE_AS; an_int: READABLE_STRING_8)
 			-- Error when an incorrect type `a_type' is specified for an integer constant `an_int'.
 		require
 			a_type_not_void: a_type /= Void
@@ -489,13 +497,12 @@ feature {AST_FACTORY} -- Error handling
 			report_one_error (an_error)
 		end
 
-	report_integer_too_large_error (a_type: detachable TYPE_AS; an_int: STRING)
+	report_integer_too_large_error (a_type: detachable TYPE_AS; an_int: READABLE_STRING_8)
 			-- `an_int', although only made up of digits, doesn't fit
 			-- in an INTEGER (i.e. greater than maximum_integer_value).
 		require
 			an_int_not_void: an_int /= Void
 		local
-			an_error: SYNTAX_ERROR
 			l_message: STRING
 		do
 			fixme ("Change plain syntax error to Integer_too_large error when the corresponding validity rule is available.")
@@ -504,17 +511,15 @@ feature {AST_FACTORY} -- Error handling
 			else
 				l_message := "Integer value " + an_int + " is too large for any integer type."
 			end
-			create an_error.make (line, column, filename, l_message)
-			report_one_error (an_error)
+			report_one_error (create {SYNTAX_ERROR}.make (line, column, filename, l_message))
 		end
 
-	report_integer_too_small_error (a_type: detachable TYPE_AS; an_int: STRING)
+	report_integer_too_small_error (a_type: detachable TYPE_AS; an_int: READABLE_STRING_8)
 			-- `an_int', although only made up of digits, doesn't fit
 			-- in an INTEGER (i.e. less than minimum_integer_value).
 		require
 			an_int_not_void: an_int /= Void
 		local
-			an_error: SYNTAX_ERROR
 			l_message: STRING
 		do
 			fixme ("Change plain syntax error to Integer_too_small error when the corresponding validity rule is available.")
@@ -523,21 +528,16 @@ feature {AST_FACTORY} -- Error handling
 			else
 				l_message := "Integer value " + an_int + " is too small for any integer type."
 			end
-			create an_error.make (line, column, filename, l_message)
-			report_one_error (an_error)
+			report_one_error (create {SYNTAX_ERROR}.make (line, column, filename, l_message))
 		end
 
-	report_character_code_too_large_error (a_code: STRING)
+	report_character_code_too_large_error (a_code: READABLE_STRING_8)
 			-- Integer encoded by `a_code' is too large to fit into a CHARACTER_32
 		require
 			a_code_not_void: a_code /= Void
-		local
-			l_message: STRING
-			an_error: BAD_CHARACTER
 		do
-			l_message := "Character code " + a_code + " is too large for CHARACTER_32."
-			create an_error.make (line, column, filename, l_message)
-			report_one_error (an_error)
+			report_one_error (create {BAD_CHARACTER}.make (line, column, filename,
+				"Character code " + a_code + " is too large for CHARACTER_32."))
 		end
 
 feature {NONE} -- Implementation
@@ -588,6 +588,26 @@ feature {NONE} -- Implementation
 						l_value.to_upper
 					end
 				end
+			end
+		end
+
+	process_string_character_as_value (str: READABLE_STRING_8)
+			-- Check whether `str' is a valid character value
+			-- in a string and set `last_token' accordingly.
+		require
+			not_empty: str.count >= 0
+		do
+			if
+				attached ast_factory.new_temporary_integer_value (Current, '+', str) as i
+			then
+				if i.natural_64_value <= {NATURAL_32}.Max_value then
+					process_string_character_code (i.natural_32_value)
+				else
+					report_character_code_too_large_error (str)
+				end
+			else
+				check unsupported: False end
+				report_string_bad_special_character_error
 			end
 		end
 
@@ -667,7 +687,7 @@ feature {NONE} -- Implementation
 				end
 			end
 			nb := verbatim_marker.count
-			if nb = (text_count - j) then
+			if nb = text_count - j then
 				Result := True
 				from i := 1 until i > nb loop
 					if verbatim_marker.item (i) = text_item (j) then
@@ -693,7 +713,7 @@ feature {NONE} -- Implementation
 		do
 			from
 				verbatim_common_columns := 0
-				done := s.count = 0
+				done := s.is_empty
 			until
 				done
 			loop
@@ -726,7 +746,7 @@ feature {NONE} -- Implementation
 							s.remove (i)
 							i := s.index_of ('%N', i)
 						end
-						done := s.count = 0
+						done := s.is_empty
 					else
 						done := True
 					end
@@ -849,24 +869,30 @@ feature {NONE} -- Implementation
 				elseif c <= 0xDF then
 						-- 110xxxxx 10xxxxxx
 					i := i + 2
-					if i <= n then
+					if i - 1 <= n then
 						cp := cp + 1
 						cc := cc + 1
 					end
 				elseif c <= 0xEF then
 						-- 1110xxxx 10xxxxxx 10xxxxxx
 					i := i + 3
-					if i <= n then
+					if i - 1 <= n then
 						cp := cp + 1
 						cc := cc + 1
 					end
 				elseif c <= 0xF7 then
 						-- 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
 					i := i + 4
-					if i <= n then
+					if i - 1 <= n then
 						cp := cp + 1
 						cc := cc + 1
 					end
+				else
+					check should_not_occur: False end
+						-- unexpected case for valid UTF-8 encoded text.
+					i := i + 1
+					cp := cp + 1
+					cc := cc + 1
 				end
 			end
 			next_character_column := cc
@@ -893,7 +919,7 @@ invariant
 	filename_not_void: filename /= Void
 
 note
-	copyright: "Copyright (c) 1984-2018, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

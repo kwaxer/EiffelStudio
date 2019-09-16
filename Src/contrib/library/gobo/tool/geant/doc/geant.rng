@@ -3,7 +3,7 @@
 <!--
 	description: "Eiffel Ant RelaxNG specification"
 	system: "Gobo Eiffel Ant"
-	copyright: "Copyright (c) 2002-2009, Sven Ehrke and others"
+	copyright: "Copyright (c) 2002-2019, Sven Ehrke and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -100,7 +100,6 @@
 				<ref name="geyacc"/>
 				<ref name="gepp"/>
 				<ref name="getest"/>
-				<ref name="gexace"/>
 				<ref name="gexmlsplit"/>
 				<ref name="ise"/>
 				<ref name="mkdir"/>
@@ -289,7 +288,10 @@
 			</optional>
 			<choice>
 				<group>
-					<attribute name="ace"/>
+					<attribute name="ecf"/>
+					<optional>
+						<attribute name="target"/>
+					</optional>
 					<optional>
 						<attribute name="finalize"/>
 					</optional>
@@ -297,7 +299,7 @@
 						<attribute name="gelint"/>
 					</optional>
 					<optional>
-						<attribute name="cat"/>
+						<attribute name="catcall"/>
 					</optional>
 					<optional>
 						<attribute name="split"/>
@@ -310,6 +312,27 @@
 					</optional>
 					<optional>
 						<attribute name="gc"/>
+					</optional>
+					<optional>
+						<attribute name="thread"/>
+					</optional>
+					<optional>
+						<attribute name="new_instance_types"/>
+					</optional>
+					<optional>
+						<attribute name="silent"/>
+					</optional>
+					<optional>
+						<attribute name="verbose"/>
+					</optional>
+					<optional>
+						<attribute name="no_benchmark"/>
+					</optional>
+					<optional>
+						<attribute name="nested_benchmark"/>
+					</optional>
+					<optional>
+						<attribute name="metrics"/>
 					</optional>
 				</group>
 				<attribute name="clean"/>
@@ -431,50 +454,6 @@
 			</zeroOrMore>
 		</element>
 	</define>
-	<define name="gexace">
-		<element name="gexace">
-			<ref name="dir_if_unless"/>
-			<choice>
-				<attribute name="validate"/>
-				<attribute name="system">
-					<!-- runtime evaluation
-					<choice>
-						<value>ise</value>
-						<value>ge</value>
-					</choice>
-					-->
-				</attribute>
-				<attribute name="library">
-					<!-- runtime evaluation
-					<choice>
-						<value>ise</value>
-						<value>ge</value>
-					</choice>
-					-->
-				</attribute>
-				<attribute name="format">
-					<!-- runtime evaluation
-					<choice>
-						<value>ace</value>
-						<value>ecf</value>
-						<value>xace</value>
-					</choice>
-					-->
-			</choice>
-			<optional>
-				<attribute name="verbose"/>
-			</optional>
-			<optional>
-				<attribute name="xace"/>
-			</optional>
-			<optional>
-				<attribute name="output"/>
-			</optional>
-			<zeroOrMore>
-				<ref name="define"/>
-			</zeroOrMore>
-		</element>
-	</define>
 	<define name="ise">
 		<element name="ise">
 			<ref name="dir_if_unless"/>
@@ -485,7 +464,10 @@
 				<group>
 					<attribute name="system"/>
 					<optional>
-						<attribute name="ace"/>
+						<attribute name="ecf"/>
+					</optional>
+					<optional>
+						<attribute name="target"/>
 					</optional>
 					<optional>
 						<attribute name="finalize"/>

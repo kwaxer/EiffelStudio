@@ -3,7 +3,7 @@
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
 	date: "$Date$"
-	revision	: "$Revision$"
+	revision: "$Revision$"
 
 class
 	EB_DEVELOPMENT_WINDOW
@@ -193,6 +193,49 @@ feature {EB_DEVELOPMENT_WINDOW_BUILDER} -- Initialization
 			save_all_cmd := a_cmd
 		ensure
 			set: save_all_cmd = a_cmd
+		end
+
+feature -- DPI handling
+
+	dpi: NATURAL
+			-- Return the dots per inch (dpi) of the monitor
+			-- DPI sizes 96, 120, 144, 192, etc.
+		do
+			Result := dpi_cache
+			if Result = 0 then
+				update_dpi ({EV_MONITOR_DPI_DETECTOR_IMP}.dpi.to_integer_32)
+				Result := dpi_cache
+			end
+		end
+
+	update_dpi (a_dpi: INTEGER)
+		require
+			a_dpi > 0
+		do
+			if attached {EXECUTION_ENVIRONMENT}.item ("ISE_STUDIO_DPI") as l_forced_dpi and then l_forced_dpi.is_integer then
+				dpi_cache := l_forced_dpi.to_natural_32
+				if dpi_cache <= 0 then
+					dpi_cache := a_dpi.to_natural_32
+				end
+			else
+				dpi_cache := a_dpi.to_natural_32
+			end
+		ensure
+			dpi_cache_updated: dpi_cache = a_dpi or else dpi_cache /= 0
+		end
+
+	dpi_cache: like dpi
+
+	scaled_size (a_size: INTEGER): INTEGER
+			-- Scaled size of `a_size`.
+		local
+			l_dpi: like dpi
+		do
+			Result := a_size
+			l_dpi := dpi
+			if l_dpi > 0 then
+				Result := (Result * (dpi / 96)).rounded
+			end
 		end
 
 feature {NONE} -- Clean up
@@ -489,8 +532,8 @@ feature -- Status setting
 	set_focus_to_main_editor
 			-- Set focus to main current editor.
 		do
-			if editors_manager /= Void and then editors_manager.current_editor /= Void then
-				editors_manager.select_editor (editors_manager.current_editor, True)
+			if attached editors_manager as edmgr and then attached edmgr.current_editor as ed then
+				edmgr.select_editor (ed, True)
 			end
 		end
 
@@ -802,8 +845,8 @@ feature -- Stone process
 				update_save_symbol
 			end
 		ensure then
-			stone_set: not is_processing_stone implies stone = a_stone
-			editor_stone: (not is_processing_stone and then attached a_stone) implies editors_manager.current_editor.stone = a_stone
+			-- stone_set: If there are no errors with the store, then: not is_processing_stone implies stone = a_stone
+			-- editor_stone: If there are no errors with the store, then: (not is_processing_stone and then attached a_stone) implies editors_manager.current_editor.stone = a_stone
 		end
 
 	refresh
@@ -829,7 +872,6 @@ feature -- Stone process
 		local
 			l_toolbarable_commands: ARRAYED_LIST [EB_TOOLBARABLE_COMMAND]
 			l_simple_cmds: ARRAYED_LIST [EB_SIMPLE_SHORTCUT_COMMAND]
-			l_focus_commands: ARRAYED_LIST [EB_CLOSE_PANEL_COMMAND]
 			l_main_formatter: ARRAYED_LIST [EB_CLASS_TEXT_FORMATTER]
 			l_editor_commands: ARRAYED_LIST [EB_GRAPHICAL_COMMAND]
 		do
@@ -871,14 +913,10 @@ feature -- Stone process
 			end
 
 				-- Update focus related commands
-			l_focus_commands := commands.focus_commands
-			from
-				l_focus_commands.start
-			until
-				l_focus_commands.after
+			across
+				commands.focus_commands as ic
 			loop
-				l_focus_commands.item.update (window)
-				l_focus_commands.forth
+				ic.item.update (window)
 			end
 
 				-- Update main formatters shortcuts and interfaces
@@ -903,6 +941,7 @@ feature -- Stone process
 			Freeze_project_cmd.update (window)
 			Finalize_project_cmd.update (window)
 			project_cancel_cmd.update (window)
+			clean_compile_project_cmd.update (window)
 
 				-- Update analyzer commands.
 			analyze_cmd.update (window)
@@ -1536,6 +1575,19 @@ feature {EB_WINDOW_MANAGER, EB_DEVELOPMENT_WINDOW_MAIN_BUILDER} -- Window manage
 						-- since if maximized we know the size of the window, it is
 						-- the size of the screen.
 					development_window_data.save_size (window.width, window.height)
+				end
+			end
+		end
+
+	save_size_and_dpi
+			-- Save window size abd dpi.
+		do
+			if not window.is_minimized then
+				if not window.is_maximized then
+						-- Only save the size of the window if not maximized,
+						-- since if maximized we know the size of the window, it is
+						-- the size of the screen.
+					development_window_data.save_size_and_dpi (dpi, window.width, window.height)
 				end
 			end
 		end
@@ -2553,7 +2605,7 @@ invariant
 	window_id_positive: window_id > 0
 
 note
-	copyright: "Copyright (c) 1984-2017, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

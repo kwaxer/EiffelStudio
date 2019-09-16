@@ -19,6 +19,8 @@ inherit
 
 	CONF_FILE
 
+	CONF_FILE_CONSTANTS
+
 	DEBUG_OUTPUT
 
 create {CONF_PARSE_FACTORY}
@@ -26,12 +28,13 @@ create {CONF_PARSE_FACTORY}
 
 feature {NONE} -- Initialization
 
-	make_with_uuid (a_file_name: READABLE_STRING_GENERAL; a_name: like name; a_uuid: UUID)
+	make_with_uuid (a_file_name: READABLE_STRING_GENERAL; a_name: like name; a_uuid: UUID; a_namespace: READABLE_STRING_32)
 			-- Creation with `a_name' and `a_uuid'.
 		require
 			a_file_name_valid: a_file_name /= Void and then not a_file_name.is_empty
 			a_name_ok: a_name /= Void and not a_name.is_empty
 			a_uuid_ok: a_uuid /= Void
+			a_namespace_valid: is_namespace_known (a_namespace)
 		do
 				-- TODO: remove case conversion when working with keys of `targets`.
 			create targets.make_caseless (1)
@@ -40,11 +43,13 @@ feature {NONE} -- Initialization
 			name := a_name.as_lower
 			set_file_name (a_file_name)
 			uuid := a_uuid
+			namespace := a_namespace
 			is_readonly := True
 		ensure
 			name_set: name /= Void and then name.is_equal (a_name.as_lower)
 			file_name_set: a_file_name.same_string (file_name)
 			uuid_set: uuid = a_uuid
+			namespace_set: namespace = a_namespace
 			is_readonly: is_readonly
 		end
 
@@ -93,6 +98,10 @@ feature -- Access, stored in configuration file
 			-- Is `uuid' internally generated?
 			-- i.e the original ecf has no uuid value.
 
+	namespace: READABLE_STRING_32
+			-- The namespace used when loading the system.
+			-- It is used to compute settings with different defaults in different versions.
+
 	is_readonly: BOOLEAN
 			-- Is this system readonly per default if it is used as a library?
 
@@ -102,7 +111,7 @@ feature -- Access, stored in configuration file
 	target (a_name: READABLE_STRING_GENERAL): detachable CONF_TARGET
 			-- Configuration target named `a_name`, if any.
 		do
-			Result := targets.item (a_name.as_lower)
+			Result := targets.item (a_name)
 		end
 
 	library_target: detachable CONF_TARGET
@@ -209,7 +218,10 @@ feature {CONF_ACCESS} -- Access, in compiled only
 feature -- Access queries
 
 	compilable_targets: like targets
-			-- The compilable targets.
+			-- Compilable targets.
+			--| note: in order to satisfy precondition, see {CONF_PARENT_TARGET_CHECKER}.resolve_system to resolve the eventual parent.
+		require
+			no_unresolved_parents: across targets as ic all not ic.item.has_unresolved_parent end
 		local
 			l_target: CONF_TARGET
 		do
@@ -455,7 +467,7 @@ feature -- Equality
 				l_library_target := library_target
 				l_other_library_target := other.library_target
 				Result := (l_library_target = Void and l_other_library_target = Void) or
-					((l_library_target /= Void and l_other_library_target /= Void) and then l_library_target.name.is_equal (l_other_library_target.name) )
+					((l_library_target /= Void and l_other_library_target /= Void) and then l_library_target.name.is_case_insensitive_equal (l_other_library_target.name) )
 				from
 					targets.start
 					l_o_targets := other.targets
@@ -527,7 +539,7 @@ invariant
 	valid_level: valid_level
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

@@ -6,7 +6,7 @@ note
 		Look for invalid class name clashes and invalid class overriding.
 	]"
 	library: "Gobo Eiffel Tools Library"
-	copyright: "Copyright (c) 2009-2014, Eric Bezault and others"
+	copyright: "Copyright (c) 2009-2019, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -16,8 +16,9 @@ class ET_MASTER_CLASS_CHECKER
 inherit
 
 	ET_AST_NULL_PROCESSOR
+		rename
+			make as make_ast_processor
 		redefine
-			make,
 			process_master_class
 		end
 
@@ -30,10 +31,15 @@ create
 
 feature {NONE} -- Initialization
 
-	make
+	make (a_system_processor: like system_processor)
 			-- Create a new master class checker.
+		require
+			a_system_processor_not_void: a_system_processor /= Void
 		do
 			create current_class.make (tokens.unknown_class_name, tokens.unknown_system)
+			system_processor := a_system_processor
+		ensure
+			system_processor_set: system_processor = a_system_processor
 		end
 
 feature -- Validity checking
@@ -61,21 +67,20 @@ feature {NONE} -- Validity checking
 			-- Check validity of intrinsic classes.
 			-- Set `has_fatal_error' if a fatal error occurred.
 		local
-			l_classes: DS_ARRAYED_LIST [ET_CLASS]
 			l_override_class: detachable ET_CLASS
 			l_non_override_class: detachable ET_CLASS
-			l_imported_classes: DS_ARRAYED_LIST [ET_MASTER_CLASS]
 			i, nb: INTEGER
 		do
 			l_override_class := current_class.first_local_override_class
 			if l_override_class /= Void then
-				l_classes := current_class.other_local_override_classes
-				nb := l_classes.count
-				from i := 1 until i > nb loop
-						-- Error: Two classes with the same name in two override groups.
-					set_fatal_error
-					error_handler.report_vscn0a_error (current_universe, current_class, l_classes.item (i), l_override_class)
-					i := i + 1
+				if attached current_class.other_local_override_classes as l_classes then
+					nb := l_classes.count
+					from i := 1 until i > nb loop
+							-- Error: Two classes with the same name in two override groups.
+						set_fatal_error
+						error_handler.report_vscn0a_error (current_universe, current_class, l_classes.item (i), l_override_class)
+						i := i + 1
+					end
 				end
 			end
 			l_non_override_class := current_class.first_local_non_override_class
@@ -83,16 +88,17 @@ feature {NONE} -- Validity checking
 				if l_override_class /= Void then
 					check_overridden_class_validity (l_non_override_class, l_override_class)
 				end
-				l_classes := current_class.other_local_non_override_classes
-				nb := l_classes.count
-				from i := 1 until i > nb loop
-					if l_override_class /= Void then
-						check_overridden_class_validity (l_classes.item (i), l_override_class)
+				if attached current_class.other_local_non_override_classes as l_classes then
+					nb := l_classes.count
+					from i := 1 until i > nb loop
+						if l_override_class /= Void then
+							check_overridden_class_validity (l_classes.item (i), l_override_class)
+						end
+							-- Error: Two classes with the same name in two non-override groups.
+						set_fatal_error
+						error_handler.report_vscn0a_error (current_universe, current_class, l_classes.item (i), l_non_override_class)
+						i := i + 1
 					end
-						-- Error: Two classes with the same name in two non-override groups.
-					set_fatal_error
-					error_handler.report_vscn0a_error (current_universe, current_class, l_classes.item (i), l_non_override_class)
-					i := i + 1
 				end
 			end
 			if attached current_class.first_imported_class as l_imported_class then
@@ -104,16 +110,17 @@ feature {NONE} -- Validity checking
 					set_fatal_error
 					error_handler.report_vscn0a_error (current_universe, current_class, l_imported_class, l_non_override_class)
 				end
-				l_imported_classes := current_class.other_imported_classes
-				nb := l_imported_classes.count
-				from i := 1 until i > nb loop
-					if l_override_class /= Void then
-						check_overridden_class_validity (l_imported_classes.item (i), l_override_class)
+				if attached current_class.other_imported_classes as l_imported_classes then
+					nb := l_imported_classes.count
+					from i := 1 until i > nb loop
+						if l_override_class /= Void then
+							check_overridden_class_validity (l_imported_classes.item (i), l_override_class)
+						end
+							-- Error: Two classes with the same name in two non-override groups.
+						set_fatal_error
+						error_handler.report_vscn0a_error (current_universe, current_class, l_imported_classes.item (i), l_imported_class)
+						i := i + 1
 					end
-						-- Error: Two classes with the same name in two non-override groups.
-					set_fatal_error
-					error_handler.report_vscn0a_error (current_universe, current_class, l_imported_classes.item (i), l_imported_class)
-					i := i + 1
 				end
 			end
 		end
@@ -142,11 +149,9 @@ feature {NONE} -- Validity checking
 			-- Check validity of overriding classes.
 			-- Set `has_fatal_error' if a fatal error occurred.
 		local
-			l_other_overriding_classes: DS_ARRAYED_LIST [ET_MASTER_CLASS]
 			i, nb: INTEGER
 		do
-			l_other_overriding_classes := current_class.other_overriding_classes
-			if not l_other_overriding_classes.is_empty and then attached current_class.first_overriding_class as l_overriding_class then
+			if attached current_class.other_overriding_classes as l_other_overriding_classes and then not l_other_overriding_classes.is_empty and then attached current_class.first_overriding_class as l_overriding_class then
 				nb := l_other_overriding_classes.count
 				from i := 1 until i > nb loop
 						-- Error: a class cannot be overridden by more than one class.
@@ -178,6 +183,9 @@ feature -- Access
 			current_system_not_void: Result /= Void
 		end
 
+	system_processor: ET_SYSTEM_PROCESSOR
+			-- System processor currently used
+
 feature -- Error handling
 
 	has_fatal_error: BOOLEAN
@@ -202,7 +210,7 @@ feature -- Error handling
 	error_handler: ET_ERROR_HANDLER
 			-- Error handler
 		do
-			Result := current_system.error_handler
+			Result := system_processor.error_handler
 		ensure
 			error_handler_not_void: Result /= Void
 		end
@@ -218,5 +226,6 @@ feature {ET_MASTER_CLASS} -- Processing
 invariant
 
 	current_class_not_void: current_class /= Void
+	system_processor_not_void: system_processor /= Void
 
 end

@@ -61,7 +61,9 @@ feature -- HTTP Methods
 			create l_rhf
 			if attached current_media_type (req) as l_type then
 				if attached current_user_name (req) as l_user then
-					log.write_information ( generator+".do_get Processing request: user:" + l_user  )
+					debug
+						log.write_information ( generator+".do_get Processing request: user:" + l_user  )
+					end
 					l_role := api_service.role (l_user)
 					if l_role.is_administrator or else l_role.is_responsible then
 						-- Show subscribe to category page
@@ -102,7 +104,7 @@ feature -- HTTP Methods
 
 feature -- Implementation
 
-	extract_data_from_request (req: WSF_REQUEST; a_type: READABLE_STRING_32): LIST [INTEGER]
+	extract_data_from_request (req: WSF_REQUEST; a_type: READABLE_STRING_8): LIST [INTEGER]
 			-- Is the form data populated?
 		do
 

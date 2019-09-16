@@ -4,7 +4,7 @@
 		"C functions used to implement type information"
 
 	system: "Gobo Eiffel Compiler"
-	copyright: "Copyright (c) 2016, Eric Bezault and others"
+	copyright: "Copyright (c) 2016-2018, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -21,9 +21,6 @@
 #endif
 #ifndef GE_STRING_H
 #include "ge_string.h"
-#endif
-#ifndef GE_EXCEPTION_H
-#include "ge_exception.h"
 #endif
 
 #ifdef __cplusplus
@@ -55,7 +52,6 @@ EIF_ENCODED_TYPE GE_encoded_type(EIF_TYPE a_type)
 	l_result = a_type.annotations;
 	l_result = (l_result << 16) | a_type.id;
 #endif
-
 	return l_result;
 }
 
@@ -78,7 +74,6 @@ EIF_TYPE GE_decoded_type(EIF_ENCODED_TYPE a_type)
 	l_result.id = a_type & 0x0000FFFF;
 	l_result.annotations = a_type >> 16;
 #endif
-
 	return l_result;
 }
 
@@ -111,8 +106,10 @@ EIF_TYPE GE_non_attached_type(EIF_TYPE a_type)
  */
 EIF_TYPE GE_attached_type(EIF_TYPE a_type)
 {
-	a_type.annotations &= ~DETACHABLE_FLAG;
-	a_type.annotations |= ATTACHED_FLAG;
+	if (!GE_is_expanded_type_index(a_type.id)) {
+		a_type.annotations &= ~DETACHABLE_FLAG;
+		a_type.annotations |= ATTACHED_FLAG;
+	}
 	return a_type;
 }
 
@@ -236,8 +233,13 @@ EIF_REFERENCE GE_generating_type_of_encoded_type(EIF_ENCODED_TYPE a_type)
 	const char* l_name;
 #ifdef GE_USE_TYPE_NAME
 /* TODO: check that `a_type' is valid. */
-/* TODO: handle type annotations. */
-	l_name = GE_type_infos[GE_decoded_type(a_type).id].name;
+	EIF_TYPE l_decoded_type;
+
+	l_decoded_type = GE_decoded_type(a_type);
+	l_name = GE_type_infos[l_decoded_type.id].name;
+	if (!l_decoded_type.annotations) {
+		l_name++;
+	}
 #else
 	l_name = "";
 #endif
@@ -252,12 +254,15 @@ EIF_ENCODED_TYPE GE_encoded_type_from_name(EIF_POINTER a_name)
 {
 #ifdef GE_USE_TYPE_NAME
 /* TODO: check that `a_type' is valid. */
-/* TODO: handle type annotations. */
 	int i;
+	const char* l_name;
 
 	for (i = 1; i <= GE_type_info_count; i++) {
-		if (strcmp((char*) a_name, GE_type_infos[i].name) == 0) {
+		l_name = GE_type_infos[i].name;
+		if (strcmp((char*)a_name, l_name + 1) == 0) {
 			return (EIF_INTEGER)GE_encoded_type(GE_new_type(i, 0x0));
+		} else if (strcmp((char*)a_name, l_name) == 0) {
+			return (EIF_INTEGER)GE_encoded_type(GE_new_type(i, ATTACHED_FLAG));
 		}
 	}
 #endif
@@ -270,19 +275,25 @@ EIF_ENCODED_TYPE GE_encoded_type_from_name(EIF_POINTER a_name)
 EIF_BOOLEAN GE_encoded_type_conforms_to(EIF_ENCODED_TYPE a_type_1, EIF_ENCODED_TYPE a_type_2)
 {
 #ifdef GE_USE_ANCESTORS
-	GE_type_info l_type_info_1;
+	GE_type_info l_type_info_1, l_type_info_2;
 	GE_ancestor** l_ancestors;
 	uint32_t l_ancestor_count, i;
+	EIF_TYPE l_decoded_type_1, l_decoded_type_2;
 	EIF_TYPE_INDEX l_type_index_1, l_type_index_2, l_ancestor_type_index;
+	uint32_t l_flags_1, l_flags_2;
 
-/* TODO: take into account type annotation */
-	l_type_index_1 = GE_decoded_type(a_type_1).id;
-	l_type_index_2 = GE_decoded_type(a_type_2).id;
+	l_decoded_type_1 = GE_decoded_type(a_type_1);
+	l_decoded_type_2 = GE_decoded_type(a_type_2);
+	l_type_index_1 = l_decoded_type_1.id;
+	l_type_index_2 = l_decoded_type_2.id;
 	l_type_info_1 = GE_type_infos[l_type_index_1];
-	if (l_type_info_1.flags & GE_TYPE_FLAG_NONE) {
-			/* NONE */
-		uint32_t l_flags = GE_type_infos[l_type_index_2].flags;
-		return EIF_TEST(!(l_flags & GE_TYPE_FLAG_EXPANDED));
+	l_type_info_2 = GE_type_infos[l_type_index_2];
+	l_flags_1 = l_type_info_1.flags;
+	l_flags_2 = l_type_info_2.flags;
+	if (!(l_flags_1 & GE_TYPE_FLAG_EXPANDED || l_decoded_type_1.annotations & ATTACHED_FLAG) && (l_flags_2 & GE_TYPE_FLAG_EXPANDED || l_decoded_type_2.annotations & ATTACHED_FLAG)) {
+		return EIF_FALSE;
+	} else if (l_flags_1 & GE_TYPE_FLAG_NONE) {
+		return EIF_TEST(!(l_flags_2 & GE_TYPE_FLAG_EXPANDED));
 	} else {
 		l_ancestors = l_type_info_1.ancestors;
 		l_ancestor_count = l_type_info_1.ancestor_count;
@@ -435,7 +446,7 @@ EIF_NATURAL_64 GE_object_size(EIF_POINTER a_object)
 	EIF_TYPE_INDEX l_type_index = ((EIF_REFERENCE)(a_object))->id;
 	uint64_t l_size = GE_type_infos[l_type_index].object_size;
 #ifdef GE_USE_TYPE_GENERIC_PARAMETERS
-	if (GE_is_special_type_index (l_type_index)) {
+	if (GE_is_special_type_index(l_type_index)) {
 		EIF_TYPE_INDEX l_generic_parameter = GE_decoded_type(GE_type_infos[l_type_index].generic_parameters[0]).id;
 		uint32_t l_flags = GE_type_infos[l_generic_parameter].flags;
 		EIF_INTEGER l_capacity = ((EIF_SPECIAL*)a_object)->capacity;
@@ -519,7 +530,7 @@ EIF_BOOLEAN GE_is_field_expanded_of_type_index(EIF_INTEGER i, EIF_TYPE_INDEX a_t
  * Get a lock on `GE_mark_object' and `GE_unmark_object' routines so that
  * 2 threads cannot `GE_mark_object' and `GE_unmark_object' at the same time.
  */
-void GE_lock_marking()
+void GE_lock_marking(void)
 {
 #ifdef GE_USE_THREADS
 /* TODO */
@@ -530,7 +541,7 @@ void GE_lock_marking()
  * Release a lock on `GE_mark_object' and `GE_unmark_object', so that another
  * thread can use `GE_mark_object' and `GE_unmark_object'.
  */
-void GE_unlock_marking()
+void GE_unlock_marking(void)
 {
 #ifdef GE_USE_THREADS
 /* TODO */
@@ -566,7 +577,7 @@ void GE_unmark_object(EIF_POINTER obj)
  * Note: returned object is not initialized and may
  * hence violate its invariant.
  * `a_type' cannot represent a SPECIAL type, use
- * `GE_new_special_instance_of_special_type_index' instead.
+ * `GE_new_special_of_reference_instance_of_type_index' instead.
  */
 EIF_REFERENCE GE_new_instance_of_type_index(EIF_TYPE_INDEX a_type)
 {
@@ -582,10 +593,10 @@ EIF_REFERENCE GE_new_instance_of_type_index(EIF_TYPE_INDEX a_type)
 
 /*
  * New instance of dynamic `a_type' that represents
- * a SPECIAL with can contain `a_capacity' element. To create a SPECIAL of
- * basic type, use `SPECIAL'.
+ * a SPECIAL with can contain `a_capacity' elements of reference type.
+ * To create a SPECIAL of basic type, use class SPECIAL directly.
  */
-EIF_REFERENCE GE_new_special_any_instance_of_type_index(EIF_TYPE_INDEX a_type, EIF_INTEGER a_capacity)
+EIF_REFERENCE GE_new_special_of_reference_instance_of_type_index(EIF_TYPE_INDEX a_type, EIF_INTEGER a_capacity)
 {
 	EIF_REFERENCE (*l_new)(EIF_INTEGER,EIF_BOOLEAN);
 
@@ -602,12 +613,15 @@ EIF_REFERENCE GE_new_special_any_instance_of_type_index(EIF_TYPE_INDEX a_type, E
  */
 EIF_REFERENCE GE_new_type_instance_of_encoded_type(EIF_ENCODED_TYPE a_type)
 {
+	EIF_TYPE l_decoded_type;
 	EIF_TYPE_INDEX l_type_index;
+	EIF_TYPE_INDEX l_annotations;
 	EIF_REFERENCE l_result;
 
-/* TODO: take into account type annotation. */
-	l_type_index = GE_decoded_type(a_type).id;
-	l_result = (EIF_REFERENCE)&(GE_types[l_type_index]);
+	l_decoded_type = GE_decoded_type(a_type);
+	l_type_index = l_decoded_type.id;
+	l_annotations = l_decoded_type.annotations;
+	l_result = (EIF_REFERENCE)&(GE_types[l_type_index][l_annotations]);
 	if (l_result->id == 0) {
 		l_result = EIF_VOID;
 		GE_raise(GE_EX_PROG);

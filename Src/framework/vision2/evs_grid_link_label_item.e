@@ -1,8 +1,5 @@
-note
-	description: "[
-		Specialized {EV_GRID_LABEL_ITEM} which displays the current text as a clickable link.
-	]"
-	author: ""
+﻿note
+	description: "Specialized {EV_GRID_LABEL_ITEM} which displays the current text as a clickable link."
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -30,8 +27,6 @@ feature {NONE} -- Initialization
 
 	make
 			-- Initialize `Current'.
-		local
-			l_pixmaps: EV_STOCK_PIXMAPS
 		do
 			set_foreground_color ((create {EV_STOCK_COLORS}).blue)
 			pointer_enter_actions.extend (
@@ -39,7 +34,6 @@ feature {NONE} -- Initialization
 					do
 						pointer_motion_actions.extend (agent on_pointer_motion)
 					end)
-
 			pointer_leave_actions.extend (
 				agent
 					do
@@ -82,7 +76,7 @@ feature {NONE} -- Status report
 		do
 			Result := last_pointer_style /= Void
 		ensure
-			definition: Result = (last_pointer_style)
+			definition: Result = attached last_pointer_style
 		end
 
 	is_first_button_active: BOOLEAN
@@ -93,10 +87,8 @@ feature {NONE} -- Implementation
 	on_pointer_motion (a_x: INTEGER; a_y: INTEGER; a_x_tilt: DOUBLE; a_y_tilt: DOUBLE; a_pressure: DOUBLE; a_screen_x: INTEGER; a_screen_y: INTEGER)
 			-- Called when pointer is being moved around on `Current'.
 		local
-			l_covers: BOOLEAN
 			l_pixmap: like pixmap
 			l_left, l_right: INTEGER
-			l_pointer: like last_pointer_style
 		do
 			l_left := left_border
 			l_pixmap := pixmap
@@ -126,13 +118,14 @@ feature {NONE} -- Implementation
 	on_pointer_release (a_x: INTEGER; a_y: INTEGER; a_button: INTEGER; a_x_tilt: DOUBLE; a_y_tilt: DOUBLE; a_pressure: DOUBLE; a_screen_x: INTEGER; a_screen_y: INTEGER)
 			-- Called when a button is released on `Current'.
 		do
-			if a_button = {EV_POINTER_CONSTANTS}.left then
-				if is_first_button_active then
-					if is_hovering then
-						select_actions.call (Void)
-					end
-					is_first_button_active := False
+			if
+				a_button = {EV_POINTER_CONSTANTS}.left and then
+				is_first_button_active
+			then
+				if is_hovering then
+					select_actions.call (Void)
 				end
+				is_first_button_active := False
 			end
 		end
 
@@ -187,8 +180,8 @@ feature {NONE} -- Assertion helpers
 		end
 
 note
-	copyright: "Copyright (c) 1984-2009, Eiffel Software"
-	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software and others"
+	license:   "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[
 			This file is part of Eiffel Software's Eiffel Development Environment.
@@ -211,10 +204,10 @@ note
 			Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 		]"
 	source: "[
-			 Eiffel Software
-			 5949 Hollister Ave., Goleta, CA 93117 USA
-			 Telephone 805-685-1006, Fax 805-685-6869
-			 Website http://www.eiffel.com
-			 Customer support http://support.eiffel.com
+			Eiffel Software
+			5949 Hollister Ave., Goleta, CA 93117 USA
+			Telephone 805-685-1006, Fax 805-685-6869
+			Website http://www.eiffel.com
+			Customer support http://support.eiffel.com
 		]"
 end

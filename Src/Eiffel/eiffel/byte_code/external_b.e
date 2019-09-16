@@ -12,13 +12,11 @@ inherit
 			set_precursor_type as set_static_class_type
 		redefine
 			allocates_memory,
-			enlarged_on,
 			inlined_byte_code,
 			is_constant_expression,
 			is_external,
 			is_unsafe,
-			need_target,
-			same
+			need_target
 		end
 
 	SHARED_INCLUDE
@@ -47,7 +45,6 @@ feature -- Visitor
 					-- We only optimize external calls on basic expanded type.
 				v.process_external_b (Current)
 			else
-
 				if not is_static_call and then not context.is_written_context then
 						-- Ensure the feature is not redeclared into attribute or internal routine.
 						-- and if redeclared as an external, make sure it is not redeclared differently.
@@ -61,7 +58,7 @@ feature -- Visitor
 					v.process_external_b (Current)
 				else
 						-- Create new byte node and process it instead of the current one.
-					byte_node (f, c).process (v)
+					byte_node (f, c.is_separate).process (v)
 				end
 			end
 		end
@@ -82,6 +79,9 @@ feature -- Attributes for externals
 
 	is_static_call: BOOLEAN
 			-- Is current external call made through a static access?
+		do
+			Result := attached static_class_type
+		end
 
 	precursor_type: like static_class_type
 		require
@@ -125,20 +125,10 @@ feature -- Routines for externals
 			extension := e
 		end;
 
-	enable_static_call
-			-- Set `is_static_call' to `True'.
-		do
-			is_static_call := True
-			set_call_kind (call_kind_unqualified)
-		ensure
-			is_static_call_set: is_static_call
-		end
-
 	enable_instance_free
 			-- Set `is_instance_free' to `True'.
 		do
 			is_instance_free := True
-			enable_static_call
 		ensure
 			is_static_call_set: is_static_call
 			is_instance_free: is_instance_free
@@ -201,37 +191,6 @@ feature -- Status report
 			end
 		end
 
-	enlarged_on (a_type_i: TYPE_A): CALL_ACCESS_B
-			-- Enlarged byte node evaluated in the context of `a_type_i'.
-		local
-			external_bl: EXTERNAL_BL
-			f: FEATURE_I
-		do
-				-- Ensure the feature is not redeclared into attribute or internal routine.
-				-- and if redeclared as an external, make sure it is not redeclared differently.
-			if
-				not is_static_call and then
-				not context.is_written_context and then
-				attached {CL_TYPE_A} a_type_i as c
-			then
-				f := c.base_class.feature_of_rout_id (routine_id)
-				if equal (f.extension, extension) then
-					f := Void
-				end
-			end
-			if f = Void then
-				if context.final_mode then
-					create external_bl
-				else
-					create {EXTERNAL_BW} external_bl.make
-				end
-				external_bl.fill_from (Current)
-				Result := external_bl
-			else
-				Result ?= byte_node (f, a_type_i).enlarged
-			end
-		end
-
 feature -- IL code generation
 
 	need_target: BOOLEAN
@@ -268,15 +227,8 @@ feature -- Inlining
 	inlined_byte_code: like Current
 		do
 			Result := Current
-			type := real_type (type)
-			if static_class_type /= Void then
-				static_class_type ?= real_type (static_class_type)
-			end
 			if parameters /= Void then
 				parameters := parameters.inlined_byte_code
-			end
-			if has_multi_constraint_static then
-				multi_constraint_static := real_type (multi_constraint_static)
 			end
 		end
 
@@ -284,7 +236,7 @@ invariant
 	static_if_instance_free: is_instance_free implies is_static_call
 
 note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

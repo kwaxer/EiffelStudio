@@ -5,7 +5,7 @@ note
 		"Integer formatters"
 
 	library: "Gobo Eiffel Utility Library"
-	copyright: "Copyright (c) 1999-2004, Eric Bezault and others"
+	copyright: "Copyright (c) 1999-2019, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -115,6 +115,8 @@ feature -- File handling
 					a_file.put_character ('9')
 				end
 			end
+		ensure
+			instance_free: class
 		end
 
 	put_decimal_natural_32 (a_file: KI_CHARACTER_OUTPUT_STREAM; a_value: NATURAL_32)
@@ -157,6 +159,8 @@ feature -- File handling
 					a_file.put_character ('9')
 				end
 			end
+		ensure
+			instance_free: class
 		end
 
 	put_octal_integer (a_file: KI_CHARACTER_OUTPUT_STREAM; an_int: INTEGER)
@@ -195,6 +199,47 @@ feature -- File handling
 					a_file.put_character ('7')
 				end
 			end
+		ensure
+			instance_free: class
+		end
+
+	put_octal_natural_32 (a_file: KI_CHARACTER_OUTPUT_STREAM; a_value: NATURAL_32)
+			-- Write octal representation of `a_value' to `a_file'.
+			-- Regexp: 0|[1-7][0-7]*
+		require
+			a_file_not_void: a_file /= Void
+			a_file_is_open_write: a_file.is_open_write
+		local
+			k: NATURAL_32
+		do
+			if a_value = 0 then
+				a_file.put_character ('0')
+			else
+				k := a_value // 8
+				if k /= 0 then
+					put_octal_natural_32 (a_file, k)
+				end
+				inspect a_value \\ 8
+				when 0 then
+					a_file.put_character ('0')
+				when 1 then
+					a_file.put_character ('1')
+				when 2 then
+					a_file.put_character ('2')
+				when 3 then
+					a_file.put_character ('3')
+				when 4 then
+					a_file.put_character ('4')
+				when 5 then
+					a_file.put_character ('5')
+				when 6 then
+					a_file.put_character ('6')
+				when 7 then
+					a_file.put_character ('7')
+				end
+			end
+		ensure
+			instance_free: class
 		end
 
 	put_hexadecimal_integer (a_file: KI_CHARACTER_OUTPUT_STREAM; an_int: INTEGER; uppercase: BOOLEAN)
@@ -275,6 +320,8 @@ feature -- File handling
 					end
 				end
 			end
+		ensure
+			instance_free: class
 		end
 
 end

@@ -77,7 +77,7 @@ feature -- Access
 			if attached option_of_name (unicode_version_switch) as o then
 				Result := o.value
 			else
-				Result := "Unknown"
+				Result := {STRING_32} "Unknown"
 			end
 		end
 
@@ -91,15 +91,17 @@ feature -- Status report
 			Result := has_option (stat_switch)
 		end
 
-feature {NONE} -- Usage
+feature -- Usage
 
 	name: STRING = "Unicode Helper Generator"
 			-- <Precursor>
 
-	version: STRING = "1.2"
+	version: STRING = "1.3"
 			-- <Precursor>
 
-	copyright: STRING = "Copyright Eiffel Software 2012-2018. All Rights Reserved."
+feature {NONE} -- Usage
+
+	copyright: STRING = "Copyright Eiffel Software 2012-2019. All Rights Reserved."
 			-- <Precursor>
 
 	switches: ARRAYED_LIST [ARGUMENT_SWITCH]

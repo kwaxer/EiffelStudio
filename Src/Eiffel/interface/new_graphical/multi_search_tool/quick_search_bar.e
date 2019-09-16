@@ -273,10 +273,15 @@ feature -- Destroy
 
 feature {NONE} -- Helpers
 
-    frozen stock_pixmaps: ES_PIXMAPS_16X16
-            -- Shared access to stock 16x16 EiffelStudio pixmaps
-        once
-            Result := (create {EB_SHARED_PIXMAPS}).icon_pixmaps
+    frozen stock_pixmaps: ES_ICONS
+            -- Shared access to stock EiffelStudio pixmaps
+        do
+        		-- TODO review
+				-- once feature to load small_pixmaps based on the Monitor DPI.	
+				-- using object-less call
+				-- Date: 05/24/2019
+
+            Result := {EB_SHARED_PIXMAPS}.icon_pixmaps
         ensure
             result_attached: Result /= Void
         end
@@ -428,7 +433,7 @@ invariant
 	option_manager_not_void: not is_recycled implies option_manager /= Void
 
 note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

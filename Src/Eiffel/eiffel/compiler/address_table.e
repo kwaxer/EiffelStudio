@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "Address table indexed by class_id"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
@@ -17,7 +17,7 @@ inherit
 			cursor as ht_cursor
 		export
 			{ADDRESS_TABLE} all
-			{ANY} valid_key, merge, has_table_of_class, table_of_class, found_item
+			{ANY} merge, has_table_of_class, table_of_class, found_item
 		end
 
 	SHARED_CODE_FILES
@@ -26,6 +26,11 @@ inherit
 		end
 
 	SHARED_TABLE
+		undefine
+			is_equal, copy
+		end
+
+	SHARED_TMP_SERVER
 		undefine
 			is_equal, copy
 		end
@@ -77,10 +82,11 @@ feature -- Access
 			class_id_valid: class_id > 0
 			feature_id_valid: feature_id > 0
 		do
-			if has_table_of_class (class_id) then
-				if found_item.has_key (feature_id) then
-					Result := found_item.found_item.has_dollar_op
-				end
+			if
+				has_table_of_class (class_id) and then
+				found_item.has_key (feature_id)
+			then
+				Result := found_item.found_item.has_dollar_op
 			end
 		end
 
@@ -123,14 +129,10 @@ feature -- Access
 			class_id_valid: a_class_id > 0 and then has_table_of_class (a_class_id)
 			feature_id_valid: a_feature_id > 0 and then table_of_class (a_class_id).has (a_feature_id)
 			has_reordering: table_of_class (a_class_id).item (a_feature_id).has (make_reordering (a_is_target_closed, a_omap))
-		local
-			l_table_of_class:  like table_of_class
-			l_table_entry: ADDRESS_TABLE_ENTRY
 		do
-			l_table_of_class := table_of_class (a_class_id)
-			l_table_entry := l_table_of_class.item (a_feature_id)
 			Result :=
-				l_table_entry.item (make_reordering (a_is_target_closed, a_omap)).frozen_age = new_frozen_age
+				table_of_class (a_class_id).item (a_feature_id).item
+					(make_reordering (a_is_target_closed, a_omap)).frozen_age = new_frozen_age
 		end
 
 	id_of_dollar_feature (a_class_id, a_feature_id: INTEGER; a_class_type: CLASS_TYPE): INTEGER
@@ -141,13 +143,8 @@ feature -- Access
 								  found_item.has_key (a_feature_id) and then
 								  found_item.found_item.has_dollar_op and then
 								  found_item.found_item.dollar_ids.has (a_class_type.static_type_id)
-		local
-			l_table_of_class: like table_of_class
-			l_table_entry: ADDRESS_TABLE_ENTRY
 		do
-			l_table_of_class := table_of_class (a_class_id)
-			l_table_entry := l_table_of_class.item (a_feature_id)
-			Result := l_table_entry.dollar_ids.item (a_class_type.static_type_id)
+			Result := table_of_class (a_class_id).item (a_feature_id).dollar_ids.item (a_class_type.static_type_id)
 		end
 
 	update_ids
@@ -155,8 +152,6 @@ feature -- Access
 		local
 			l_table_of_class:  like table_of_class
 			l_class: CLASS_C
-			l_types: TYPE_LIST
-			l_type: CLASS_TYPE
 			l_feature_id: INTEGER
 			l_table_entry: ADDRESS_TABLE_ENTRY
 			l_feature: FEATURE_I
@@ -187,18 +182,13 @@ feature -- Access
 							l_table_of_class.remove (l_feature_id)
 						else
 							if l_table_entry.has_dollar_op then
-								from
-									l_types := l_class.types
-									l_types.start
-								until
-									l_types.after
+								across
+									l_class.types as t
 								loop
-									l_type := l_types.item
-									l_type_id := l_type.static_type_id
+									l_type_id := t.item.static_type_id
 									if not l_table_entry.dollar_ids.has (l_type_id) then
 										l_table_entry.dollar_ids.put (dollar_id_counter.next, l_type_id)
 									end
-									l_types.forth
 								end
 							end
 							from
@@ -228,12 +218,9 @@ feature -- Register
 			-- Records a dollar op for the given feature in the address table
 		require
 			class_id_valid: a_class_id > 0
-		local
-			l_table_entry: ADDRESS_TABLE_ENTRY
 		do
 			if not has_dollar_operator (a_class_id, a_feature_id) then
-				l_table_entry := force_new_table_entry (a_class_id, a_feature_id)
-				l_table_entry.set_has_dollar_op
+				force_new_table_entry (a_class_id, a_feature_id).set_has_dollar_op
 				System.request_freeze
 			end
 		ensure
@@ -269,10 +256,9 @@ feature -- Register
 feature {NONE} -- Insert
 
 	force_new_table_entry (a_class_id, a_feature_id: INTEGER): ADDRESS_TABLE_ENTRY
-			-- Forces, that there is an address table entry for feature with id a_feature_id of the class with id a_class_id
+			-- Forces, that there is an address table entry for feature with id a_feature_id of the class with id a_class_id.
 		local
 			l_table_of_class: like table_of_class
-			l_table_entry: ADDRESS_TABLE_ENTRY
 		do
 			if not has_table_of_class (a_class_id) then
 				create l_table_of_class.make (1)
@@ -281,12 +267,11 @@ feature {NONE} -- Insert
 				l_table_of_class := found_item
 			end
 
-			l_table_entry := l_table_of_class.item (a_feature_id)
-			if l_table_entry = Void then
-				create l_table_entry.make
-				l_table_of_class.force (l_table_entry, a_feature_id)
+			Result := l_table_of_class.item (a_feature_id)
+			if not attached Result then
+				create Result.make
+				l_table_of_class.force (Result, a_feature_id)
 			end
-			Result := l_table_entry
 		ensure
 			has_table_of_class (a_class_id)
 		end
@@ -333,7 +318,7 @@ feature -- Generation
 				l_class := System.class_of_id (class_id)
 				System.set_current_class (l_class)
 				if l_class /= Void then
-					if (final_mode implies (not l_class.is_precompiled or else l_class.is_in_system)) then
+					if final_mode implies system.is_class_reachable (l_class) then
 						l_table_of_class := item_for_iteration
 						from
 							l_table_of_class.start
@@ -356,21 +341,13 @@ feature -- Generation
 									-- from a routine to an attribute.
 								l_table_of_class.remove (feature_id)
 							else
-									-- Feature exists
-								if l_feature.used then
+									-- The information whether a feature is used in final mode is accurate only for inline agents.
+									-- For other features, a redeclaration may be used instead.
+								if l_feature.is_inline_agent implies l_feature.used then
 										-- Feature is not dead code removed
-
-		debug ("DOLLAR")
-		io.put_string ("ADDRESS_TABLE.generate_feature ")
-		io.put_string (l_class.name)
-		io.put_character (' ')
-		io.put_string (l_feature.feature_name)
-		io.put_new_line
-		end
 									if table_entry.has_dollar_op then
 										generate_feature (l_class, l_feature, final_mode, buffer, False, False, Void, False)
 									end
-
 									from
 										table_entry.start
 									until
@@ -498,13 +475,12 @@ feature -- Generation helpers
 			from
 				i := 1
 				nb := args.count
-				create Result.make (1, nb + 1)
 				l_eif_reference_str := once "EIF_REFERENCE"
 				l_is_for_agent_and_workbench_mode := is_for_agent and then system.byte_context.workbench_mode
 				if l_is_for_agent_and_workbench_mode then
 					l_eif_typed_value_str := once "EIF_TYPED_VALUE"
 				end
-				Result.put (l_eif_reference_str, 1)
+				create Result.make_filled (l_eif_reference_str, 1, nb + 1)
 			until
 				i > nb
 			loop
@@ -585,12 +561,11 @@ feature {NONE} -- Generation
 			i: INTEGER
 			temp, l_arg: STRING
 		do
-			create Result.make (1, nb + 1)
-			Result.put (once "Current", 1)
+			create Result.make_filled ({C_CONST}.current_name, 1, nb + 1)
 			if nb > 0 then
 				from
 					i := 1
-					l_arg := once "arg"
+					l_arg := {C_CONST}.arg
 				until
 					i > nb
 				loop
@@ -694,7 +669,6 @@ feature {NONE} -- Generation
 			formal_arg_count: NATURAL_32
 			has_creation: BOOLEAN
 			names: ARRAY [STRING]
-			basic_i: BASIC_A
 			i, j: INTEGER
 			l_tabbed_open_c_comment_str, l_space_str, l_close_c_comment_str: STRING
 			l_arg_str: STRING
@@ -716,8 +690,8 @@ feature {NONE} -- Generation
 					from
 						args := seed.arguments
 						i := args.count
-						create reference_arg.make (1, i)
-						create formal_arg.make (1, i)
+						create reference_arg.make_filled (False, 1, i)
+						create formal_arg.make_filled (False, 1, i)
 					until
 						i <= 0
 					loop
@@ -910,10 +884,12 @@ feature {NONE} -- Generation
 						until
 							i <= 0
 						loop
-							if formal_arg [i] and then not reference_arg [i] then
+							if
+								formal_arg [i] and then
+								not reference_arg [i] and then
+								attached {BASIC_A} args.i_th (i).adapted_in (l_type) as basic_i
+							then
 									-- Box expanded object.
-								basic_i ?= args.i_th (i).adapted_in (l_type)
-								check basic_i_not_void: basic_i /= Void end
 								basic_i.metamorphose (create {NAMED_REGISTER}.make ("arg" + i.out, reference_c_type), create {NAMED_REGISTER}.make (names [i + 1], basic_i.c_type), buffer)
 								buffer.put_character (';')
 							end
@@ -1035,11 +1011,13 @@ feature {NONE} -- Generation
 					end
 				end
 				buffer.put_character (')')
-				if not c_return_type.is_void then
-					if not final_mode and then not is_for_agent then
-						buffer.put_character ('.')
-						c_return_type.generate_typed_field (buffer)
-					end
+				if
+					not c_return_type.is_void and then
+					not final_mode and then
+					not is_for_agent
+				then
+					buffer.put_character ('.')
+					c_return_type.generate_typed_field (buffer)
 				end
 				buffer.put_string (";")
 
@@ -1065,63 +1043,53 @@ feature {NONE} -- Generation
 						   c_return_type: TYPE_C; a_type: CLASS_TYPE; a_types: like arg_types): BOOLEAN
 		local
 			l_table_name, l_function_name: STRING
-			l_entry: POLY_TABLE [ENTRY]
-			l_rout_table: ROUT_TABLE
 			l_rout_id: INTEGER
 		do
-				-- Routine is always implemented unless found otherwise (Deferred routine
-				-- with no implementation).
-
+				-- Routine is always implemented unless found otherwise.
 			Result := True
-
 			l_rout_id := a_feature.rout_id_set.first
-			l_entry :=  Eiffel_table.poly_table (l_rout_id)
-
 			buffer.put_character ('(')
-			if l_entry.is_deferred then
-					-- Function pointer associated to a deferred feature
-					-- without any implementation
+			if attached {ROUT_TABLE} tmp_poly_server.item (l_rout_id) as t implies t.is_deferred then
+					-- A call to a non-exiting (deferred) or removed feature
+					-- because no instance of the target type is ever created.
+					-- The function behind RTNR macro takes only one argument.
 				c_return_type.generate_function_cast (buffer, <<"EIF_REFERENCE">>, False)
-				buffer.put_string ("RTNR) (")
+				buffer.put_string ({C_CONST}.rtnr_close)
+				buffer.put_two_character (' ', '(')
 				buffer.put_string (a_current_name)
 				Result := False
+			elseif t.polymorphic_status_for_body (a_type.type, a_type) = 0 then
+				l_table_name := Encoder.routine_table_name (l_rout_id)
+				c_return_type.generate_function_cast (buffer, a_types, False)
+				buffer.put_string (l_table_name)
+				buffer.put_string ("[Dtype(")
+				buffer.put_string (a_current_name)
+				buffer.put_string (") - ")
+				buffer.put_type_id (t.min_used)
+				buffer.put_string ("])(")
+					-- Remember extern declarations
+				Extern_declarations.add_routine_table (l_table_name)
+					-- Mark table used.
+				Eiffel_table.mark_used (l_rout_id)
 			else
-				if l_entry.is_polymorphic (a_type.type, a_type) then
-					l_table_name := Encoder.routine_table_name (l_rout_id)
+				t.goto_implemented (a_type.type, a_type)
+				if t.is_implemented then
 					c_return_type.generate_function_cast (buffer, a_types, False)
-					buffer.put_string (l_table_name)
-					buffer.put_string ("[Dtype(")
-					buffer.put_string (a_current_name)
-					buffer.put_string (") - ")
-					buffer.put_type_id (l_entry.min_used)
-					buffer.put_string ("])(")
-						-- Remember extern declarations
-					Extern_declarations.add_routine_table (l_table_name)
-						-- Mark table used.
-					Eiffel_table.mark_used (l_rout_id)
+					l_function_name := t.feature_name
+					buffer.put_string (l_function_name)
+					buffer.put_string (")(")
+					extern_declarations.add_routine_with_signature (c_return_type.c_string,
+						l_function_name, a_types)
 				else
-					l_rout_table ?= l_entry
-
-					l_rout_table.goto_implemented (a_type.type, a_type)
-					if l_rout_table.is_implemented then
-						c_return_type.generate_function_cast (buffer, a_types, False)
-						l_function_name := l_rout_table.feature_name
-						buffer.put_string (l_function_name)
-						buffer.put_string (")(")
-						extern_declarations.add_routine_with_signature (c_return_type.c_string,
-							l_function_name, a_types)
-					else
-							-- Function pointer associated to a deferred feature
-							-- without any implementation. We mark `l_is_implemented'
-							-- to False to not generate the argument list since
-							-- RTNR takes only one argument.
-						Result := False
-						c_return_type.generate_function_cast (buffer, <<"EIF_REFERENCE">>, False)
-						buffer.put_string ("RTNR) (")
-						buffer.put_string (a_current_name)
-					end
+						-- A call to a non-exiting (deferred) or removed feature
+						-- because no instance of the target type is ever created.
+						-- The function behind RTNR macro takes only one argument.
+					Result := False
+					c_return_type.generate_function_cast (buffer, <<"EIF_REFERENCE">>, False)
+					buffer.put_string ({C_CONST}.rtnr_close)
+					buffer.put_two_character (' ', '(')
+					buffer.put_string (a_current_name)
 				end
-
 			end
 		end
 
@@ -1135,21 +1103,18 @@ feature {NONE} -- Generation
 		local
 			l_rout_id_set: ROUT_ID_SET
 			i, nb: INTEGER
-			l_rout_id: INTEGER
-			l_entry: POLY_TABLE [ENTRY]
-			l_tables: like eiffel_table
 		do
 			from
 				l_rout_id_set := a_feature.rout_id_set
-				l_tables := eiffel_table
 				i := l_rout_id_set.lower
 				nb := l_rout_id_set.count
 			until
 				i > nb or Result
 			loop
-				l_rout_id := l_rout_id_set.item (i)
-				l_entry :=  l_tables.poly_table (l_rout_id)
-				if l_entry.is_polymorphic (a_type.type, a_type) then
+				if
+					attached {ROUT_TABLE} tmp_poly_server.item (l_rout_id_set.item (i)) as t and then
+					t.polymorphic_status_for_body (a_type.type, a_type) = 0
+				then
 					Result := True
 				end
 				i := i + 1
@@ -1160,21 +1125,10 @@ feature {NONE} -- Generation
 						   	   c_return_type: TYPE_C; a_type: CLASS_TYPE; a_types: like arg_types)
 		local
 			l_types: ARRAY [STRING]
-			i: INTEGER
-			l_eif_typed_value_str: STRING
 		do
 			buffer.put_character ('(')
-			create l_types.make (1, a_types.count)
+			create l_types.make_filled  ("EIF_TYPED_VALUE", 1, a_types.count)
 			l_types [1] := a_types [1]
-			from
-				i := l_types.count
-				l_eif_typed_value_str := "EIF_TYPED_VALUE"
-			until
-				i < 2
-			loop
-				l_types [i] := l_eif_typed_value_str
-				i := i - 1
-			end
 			c_return_type.generate_function_cast (buffer, l_types, True)
 
 			buffer.put_string ("RTVF(")
@@ -1283,7 +1237,7 @@ feature {NONE} -- Generation
 			else
 				n := a_args.count + 1
 			end
-			create Result.make (1, n)
+			create Result.make_filled ({C_CONST}.null, 1, n)
 			from
 				i := 1
 				j := 1
@@ -1345,17 +1299,15 @@ feature {NONE} -- Generation
 				l_arg_count := 2 + a_omap.count
 			end
 
-			create l_arg_names.make (1, l_arg_count)
-			create l_arg_types.make (1, l_arg_count)
-
 			tmp_buffer.clear_all
 			tmp_buffer.put_string (a_return_type)
 			tmp_buffer.put_string ("(*f_ptr) (")
 			tmp_buffer.put_string_array (a_types)
 			tmp_buffer.put_string (")")
-			l_arg_types.put (tmp_buffer.as_string, 1)
+
+			create l_arg_names.make_filled (tmp_buffer.as_string, 1, l_arg_count)
 				-- The name of the pointer is embedded in its type
-			l_arg_names.put ("", 1)
+			create l_arg_types.make_filled ("", 1, l_arg_count)
 
 			l_arg_types.put ("EIF_TYPED_VALUE *", 2)
 			l_arg_names.put ("closed", 2)
@@ -1422,7 +1374,7 @@ feature {NONE}	--implementation
 	new_frozen_age: INTEGER;
 
 note
-	copyright:	"Copyright (c) 1984-2014, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[
@@ -1453,4 +1405,4 @@ note
 			Customer support http://support.eiffel.com
 		]"
 
-end -- class ADDRESS_TABLE
+end

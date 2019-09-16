@@ -1,8 +1,7 @@
-note
+﻿note
 	description: "Window that displays a text area and a list of possible features for automatic completion"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
-	author: ""
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -42,13 +41,15 @@ feature {NONE} -- Initialization
 			vbox: EV_VERTICAL_BOX
 		do
 			create sorted_names.make_empty
+			create header_box
+			create footer_box
 			create option_bar_box
-			create option_bar_box_tpl
 			create choice_list
-			create full_list.make_empty
+			reset_full_list
 			create matches.make_empty
-			create option_template_feature
-			create code_template_label
+			create next_panel_label
+
+			docking_make
 
 			choice_list.set_default_key_processing_handler (agent (a_key: EV_KEY): BOOLEAN
 				do
@@ -66,16 +67,12 @@ feature {NONE} -- Initialization
 			choice_list.virtual_position_changed_actions.extend (agent on_scroll)
 			choice_list.mouse_wheel_actions.extend (agent on_mouse_wheel)
 
-			docking_make
-
 			create vbox
-			vbox.extend (option_template_feature)
-			vbox.disable_item_expand (option_template_feature)
+			vbox.extend (header_box)
+			vbox.disable_item_expand (header_box)
 			vbox.extend (choice_list)
-			vbox.extend (option_bar_box)
-			vbox.disable_item_expand (option_bar_box)
-			vbox.extend (option_bar_box_tpl)
-			vbox.disable_item_expand (option_bar_box_tpl)
+			vbox.extend (footer_box)
+			vbox.disable_item_expand (footer_box)
 			extend (vbox)
 			choice_list.focus_out_actions.extend (agent on_lose_focus)
 			focus_out_actions.extend (agent on_lose_focus)
@@ -83,6 +80,11 @@ feature {NONE} -- Initialization
 					do
 						resize_column_to_window_width
 					end)
+			dpi_changed_actions.extend (agent (a_dpi, i_x, i_y, i_width, i_height: INTEGER)
+					do
+						resize_column_to_window_width
+					end)
+
 		end
 
 feature -- Initialization
@@ -105,6 +107,7 @@ feature -- Initialization
 			end
 			build_full_list
 			is_closing := False
+
 			build_displayed_list (a_name)
 			is_first_show := True
 
@@ -137,14 +140,14 @@ feature -- Access
 	choice_list: EV_GRID
 			-- list displaying possible feature signatures
 
+	header_box: EV_VERTICAL_BOX
+			-- Optional header bar box to hold additional widgets.
+
+	footer_box: EV_VERTICAL_BOX
+			-- Optional footer bar box to hold additional widgets.
+
 	option_bar_box: EV_VERTICAL_BOX
 			-- Option bar box
-
-	option_bar_box_tpl: EV_VERTICAL_BOX
-			-- Option bar box for templates
-
-	option_template_feature: EV_VERTICAL_BOX
-			-- Widget to show template/feature CTRL +SPACE
 
 	sorted_names: SORTABLE_ARRAY [like name_type]
 			-- list of possible names sorted alphabetically.
@@ -155,8 +158,8 @@ feature -- Access
 	remainder: INTEGER
 			-- Number chars to remove on completion	
 
-	code_template_label: EVS_LINK_LABEL
-			-- Label code  template.
+	next_panel_label: EVS_LINK_LABEL
+			-- Label for next_panel.
 
 feature -- Settings
 
@@ -240,6 +243,13 @@ feature -- Query
 			Result := a_item /= Void
 		end
 
+	is_applicable_item_with_name (a_item: like name_type; a_name: detachable READABLE_STRING_GENERAL): BOOLEAN
+			-- Determines if `a_item' is an applicable item to show in the completion list
+			-- when name is `a_name`.
+		do
+			Result := is_applicable_item (a_item)
+		end
+
 feature {NONE} -- Events handling
 
 	mouse_selection (x_pos, y_pos, button: INTEGER; unused1,unused2,unused3: DOUBLE; unused4,unused5:INTEGER)
@@ -255,19 +265,19 @@ feature {NONE} -- Events handling
 		require
    			code_completable_set: code_completable /= Void
 		do
-			if ev_key /= Void then
+			if attached code_completable as c then
 				inspect
 					ev_key.code
 				when Key_enter then
 					close_and_complete
 				when Key_escape then
 					exit
-					code_completable.set_focus
+					c.set_focus
 				when key_back_space, key_delete then
 					if ev_application.ctrl_pressed then
-						code_completable.handle_extended_ctrled_key (ev_key)
+						c.handle_extended_ctrled_key (ev_key)
 					else
-						code_completable.handle_extended_key (ev_key)
+						c.handle_extended_key (ev_key)
 					end
 					if buffered_input /= Void and then not buffered_input.is_empty then
 						if ev_key.code = key_back_space then
@@ -283,25 +293,24 @@ feature {NONE} -- Events handling
 					select_closest_match
 				when key_v then
 					if ev_application.ctrl_pressed then
-						code_completable.handle_extended_ctrled_key (ev_key)
+						c.handle_extended_ctrled_key (ev_key)
 						if buffered_input /= Void then
 							buffered_input.append (ev_application.clipboard.text)
 						end
 					else
-						code_completable.handle_extended_key (ev_key)
+						c.handle_extended_key (ev_key)
 					end
 					select_closest_match
 				else
 					-- Do nothing
 				end
-
+			else
+				check from_precondition: False end
 			end
 		end
 
 	on_key_down (ev_key: EV_KEY)
 			-- process user input in `choice_list'	
-		local
-			l_char_string: STRING
 		do
 			if ev_key /= Void then
 				inspect
@@ -338,20 +347,25 @@ feature {NONE} -- Events handling
    			code_completable_set: code_completable /= Void
    		local
    			c: CHARACTER
-			c_name: like name_type
    		do
-			if character_string.count = 1 then
-				c := character_string.item (1).to_character_8
-				if not code_completable.unwanted_characters.item (c.code) then
-					buffered_input.append_character (c)
-					code_completable.handle_character (c)
-					create c_name.make (buffered_input)
+			if
+				character_string.count = 1 and then
+				attached code_completable as cc and then
+				attached buffered_input as b
+			then
+				c := character_string [1].to_character_8
+				if not cc.unwanted_characters.item (c.code) then
+					b.append_character (c)
+					cc.handle_character (c)
 					select_closest_match
 				else
 					close_and_complete
-					code_completable.handle_character (c)
+					cc.handle_character (c)
 					exit
 				end
+			else
+				check from_precondition: attached code_completable end
+				check from_precondition: attached buffered_input end
 			end
 		end
 
@@ -662,7 +676,6 @@ feature {NONE} -- Cursor movement
 			i: INTEGER
 			l_row: detachable EV_GRID_ROW
 			l_list: like choice_list
-			l_rows: ARRAYED_LIST [EV_GRID_ROW]
 		do
 			l_list := choice_list
 			if l_list.row_count > 0 then
@@ -733,11 +746,11 @@ feature {NONE} -- Implementation
 
 			l_list.wipe_out
 			if rebuild_list_during_matching then
-				matches := matches_based_on_name (name)
+				l_matches := matches_based_on_name (name)
 			else
-				matches := full_list.twin
+				l_matches := full_list.twin
 			end
-			l_matches := matches
+			matches := l_matches
 
 			l_list.set_column_count_to (1)
 			l_list.set_row_count_to (top_node_count_of (l_matches))
@@ -756,7 +769,7 @@ feature {NONE} -- Implementation
 				l_count > l_upper
 			loop
 				match_item := l_matches.item (l_count)
-				if is_applicable_item (match_item) then
+				if is_applicable_item_with_name (match_item, name) then
 					parent_item := Void
 					if attached match_item.parent as l_match_item_parent then
 						parent_item := l_match_item_parent
@@ -846,8 +859,6 @@ feature {NONE} -- Implementation
 			l_list: like full_list
 		do
 				-- Ensure we show the option_bar_box in full_list
-			option_bar_box_tpl.hide
-			option_bar_box.show
 			l_list := full_list
 			l_names := sorted_names
 			if not has_child_node then
@@ -878,6 +889,10 @@ feature {NONE} -- Implementation
 	full_list: like sorted_names
 			-- Sorted full list of name.
 
+	reset_full_list
+		do
+			create full_list.make_empty
+		end
 
 	has_child_node: BOOLEAN
 			-- Any child node?
@@ -989,26 +1004,28 @@ feature {NONE} -- Implementation
 		require
    			code_completable_set: code_completable /= Void
 		local
-			l_name: STRING_GENERAL
 			l_list: like choice_list
 			l_rows: ARRAYED_LIST [EV_GRID_ROW]
 		do
-			continue_completion := False
-			l_list := choice_list
-			if l_list.has_selected_row then
-				l_rows := l_list.selected_rows
-				if character_to_append = '(' then
-					character_to_append := '%U'
-				end
-				if attached {like name_type} l_rows.first.data as l_name_item then
-					if ev_application.alt_pressed then
-						l_name := l_name_item.full_insert_name
-					else
-						l_name := l_name_item.insert_name
+			if attached code_completable as c then
+				continue_completion := False
+				l_list := choice_list
+				if l_list.has_selected_row then
+					l_rows := l_list.selected_rows
+					if character_to_append = '(' then
+						character_to_append := '%U'
 					end
-					code_completable.complete_from_window (l_name, character_to_append, remainder)
-				else
-					check name_present: False end
+					if attached {like name_type} l_rows.first.data as l_name_item then
+						c.complete_from_window
+							(if ev_application.alt_pressed then
+								l_name_item.full_insert_name
+							else
+								l_name_item.insert_name
+							end,
+							character_to_append, remainder)
+					else
+						check name_present: False end
+					end
 				end
 			end
 		end
@@ -1018,22 +1035,26 @@ feature {NONE} -- Implementation
 		require
    			code_completable_set: code_completable /= Void
 		do
-			if not is_closing then
-				is_closing := True
-				show_needed := False
-				if has_capture then
-					disable_capture
+			if attached code_completable as c then
+				if not is_closing then
+					is_closing := True
+					show_needed := False
+					if has_capture then
+						disable_capture
+					end
+					save_window_position
+					hide
+					c.resume_focus_out_actions
 				end
-				save_window_position
-				hide
-				code_completable.resume_focus_out_actions
+				exit_complete_mode
+				c.block_focus_in_actions
+				if c.is_focus_back_needed then
+					c.set_focus
+				end
+				c.resume_focus_in_actions
+			else
+				check from_preconditrion: False end
 			end
-			exit_complete_mode
-			code_completable.block_focus_in_actions
-			if code_completable.is_focus_back_needed then
-				code_completable.set_focus
-			end
-			code_completable.resume_focus_in_actions
 		end
 
 	exit_complete_mode
@@ -1041,7 +1062,11 @@ feature {NONE} -- Implementation
 		require
 			code_completable_not_void: code_completable /= Void
 		do
-			code_completable.exit_complete_mode
+			if attached code_completable as c then
+				c.exit_complete_mode
+			else
+				check from_preconditrion: False end
+			end
 			continue_completion := False
 		end
 
@@ -1050,8 +1075,12 @@ feature {NONE} -- Implementation
 		require
 			code_completable_not_void: code_completable /= Void
 		do
-			if attached code_completable.save_list_position_action as l_action and is_displayed then
-				l_action.call ([screen_x, screen_y, width, height])
+			if
+				attached code_completable as c and then
+				attached c.save_list_position_action as l_action and
+				is_displayed
+			then
+				l_action (screen_x, screen_y, width, height)
 			end
 		end
 
@@ -1077,13 +1106,21 @@ feature {NONE} -- Implementation
 		local
 			l_index: INTEGER
 		do
-			from
-				l_index := 1
-			until
-				l_index > buffered_input.count
-			loop
-				code_completable.back_delete_char
-				l_index := l_index + 1
+			if
+				attached buffered_input as b and
+				attached code_completable as c
+			then
+				from
+					l_index := 1
+				until
+					l_index > b.count
+				loop
+					c.back_delete_char
+					l_index := l_index + 1
+				end
+			else
+				check from_precondition: attached buffered_input end
+				check from_precondition: attached code_completable end
 			end
 		end
 
@@ -1091,7 +1128,6 @@ feature {NONE} -- Implementation
 			-- Resize the column width to the width of the window
 		local
 			i: INTEGER
-			l_select_row_visible: BOOLEAN
 			l_list: like choice_list
 			l_visible_row: detachable EV_GRID_ROW
 		do
@@ -1144,35 +1180,39 @@ feature {NONE} -- Implementation
 			l_matches: INTEGER
 			l_list: like choice_list
 		do
-				-- Show if completion is performed on no text (completing after the period '.')
-			if rebuild_list_during_matching then
-				l_list := choice_list
+			if attached before_complete as b then
+					-- Show if completion is performed on no text (completing after the period '.')
+				if rebuild_list_during_matching then
+					l_list := choice_list
 
-					-- Show if there are mulitple items left to show
-				if l_list.row_count = 0 then
-						-- There are no items to choose from
-					if before_complete.is_empty then
-							-- There are no possible items given that there is no completion term.
-						show_needed := False
+						-- Show if there are mulitple items left to show
+					if l_list.row_count = 0 then
+							-- There are no items to choose from
+						if b.is_empty then
+								-- There are no possible items given that there is no completion term.
+							show_needed := False
+						else
+								-- There are no choices visible, but there are some available. The user
+								-- can delete a character or two to view refiltered list.
+							show_needed := not full_list.is_empty
+						end
 					else
-							-- There are no choices visible, but there are some available. The user
-							-- can delete a character or two to view refiltered list.
-						show_needed := not full_list.is_empty
-					end
-				else
-					if user_completion then
-							-- User completed without a completion term so only show completion
-							-- list if there are mulitple items available
-						if automatically_complete_words then
-							if l_list.row_count = 1 then
-								if l_list.row (1).is_expandable and then l_list.row (1).subrow_count > 1 then
-									show_needed := True
-								else
-									show_needed := not show_bypassed_for_single_choice
-								end
-							elseif l_list.row_count = 2 then
-								if l_list.row (1).is_expandable and then l_list.row (2).is_selected then
-									show_needed := False
+						if user_completion then
+								-- User completed without a completion term so only show completion
+								-- list if there are mulitple items available
+							if automatically_complete_words then
+								if l_list.row_count = 1 then
+									if l_list.row (1).is_expandable and then l_list.row (1).subrow_count > 1 then
+										show_needed := True
+									else
+										show_needed := not show_bypassed_for_single_choice
+									end
+								elseif l_list.row_count = 2 then
+									if l_list.row (1).is_expandable and then l_list.row (2).is_selected then
+										show_needed := False
+									else
+										show_needed := True
+									end
 								else
 									show_needed := True
 								end
@@ -1180,30 +1220,30 @@ feature {NONE} -- Implementation
 								show_needed := True
 							end
 						else
+								-- Completion list is being shown automatically
+	--						check
+	--							non_completion_term: before_complete.is_empty
+	--						end
 							show_needed := True
 						end
+					end
+				else
+					l_matches := matches_based_on_name (b).count
+
+					if l_matches = 0 then
+							-- Only show if the completion term is empty
+						show_needed := not b.is_empty
+					elseif l_matches = 1 and automatically_complete_words then
+							-- If there is only one item in completion list and user completed
+							-- then there is no need to show list.
+						show_needed := not user_completion
 					else
-							-- Completion list is being shown automatically
---						check
---							non_completion_term: before_complete.is_empty
---						end
+							-- Multiple items are available so show completion list
 						show_needed := True
 					end
 				end
 			else
-				l_matches := matches_based_on_name (before_complete).count
-
-				if l_matches = 0 then
-						-- Only show if the completion term is empty
-					show_needed := not before_complete.is_empty
-				elseif l_matches = 1 and automatically_complete_words then
-						-- If there is only one item in completion list and user completed
-						-- then there is no need to show list.
-					show_needed := not user_completion
-				else
-						-- Multiple items are available so show completion list
-					show_needed := True
-				end
+				check from_precondition: attached before_complete end
 			end
 		end
 
@@ -1321,7 +1361,6 @@ feature {NONE} -- String matching
 			l_index: INTEGER
 			l_list: like choice_list
 			l_full_list: like full_list
-			l_rows: ARRAYED_LIST [EV_GRID_ROW]
 		do
 			l_list := choice_list
 			if rebuild_list_during_matching then
@@ -1337,9 +1376,12 @@ feature {NONE} -- String matching
 					end
 				end
 			else
-				if not buffered_input.is_empty then
+				if
+					attached buffered_input as b and then
+					not buffered_input.is_empty
+				then
 					l_full_list := full_list
-					create l_name_for_comparison.make (buffered_input)
+					create l_name_for_comparison.make (b)
 					if l_name_for_comparison.is_binary_searchable then
 							-- Faster way getting to the position if binary search is appliable.
 						current_index := pos_of_first_greater (l_full_list, l_name_for_comparison)
@@ -1504,7 +1546,7 @@ invariant
 	choice_list_attached: choice_list /= Void
 
 note
-	copyright: "Copyright (c) 1984-2018, Eiffel Software and others"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software and others"
 	license:   "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

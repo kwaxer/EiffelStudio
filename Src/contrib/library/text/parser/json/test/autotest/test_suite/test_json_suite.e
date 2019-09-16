@@ -65,7 +65,6 @@ feature -- Tests Pass
 	test_json_and_special_character
 		local
 			parse_json: like new_json_parser
-			utf: UTF_CONVERTER
 			s: READABLE_STRING_8
 		do
 			s := "{ %"null_char%": %"null%Uchar%" }"
@@ -567,7 +566,7 @@ feature -- JSON_FROM_FILE
  		end
 
 
-	new_json_parser (a_string: STRING): JSON_PARSER
+	new_json_parser (a_string: READABLE_STRING_8): JSON_PARSER
 		do
 			create Result.make_with_string (a_string)
 		end
@@ -576,5 +575,6 @@ invariant
 	file_reader /= Void
 
 end
+
 
 

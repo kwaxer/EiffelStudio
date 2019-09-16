@@ -71,11 +71,15 @@ feature -- HTTP Methods
 		do
 			if attached req.path_parameter ("id") then
 					-- Edit a Report Problem
-				log.write_information (generator+".do_get Processing request edit_report_problem")
+				debug
+					log.write_information (generator+".do_get Processing request edit_report_problem")
+				end
 				edit_report_problem (req, res)
 			else
 					-- New Report Problem
-				log.write_information (generator+".do_get Processing request new_report_problem")
+				debug
+					log.write_information (generator+".do_get Processing request new_report_problem")
+				end
 				new_report_problem (req, res)
 			end
 		end
@@ -86,11 +90,15 @@ feature -- HTTP Methods
 		do
 			if attached req.path_parameter ("id") then
 					-- Update a Report Problem
-				log.write_information (generator+".do_post Processing request update_report_problem")
+				debug
+					log.write_information (generator+".do_post Processing request update_report_problem")
+				end
 				update_report_problem (req, res)
 			else
 					-- Initialize Report Problem
-				log.write_information (generator+".do_post Processing request initialize_report_problem")
+				debug
+					log.write_information (generator+".do_post Processing request initialize_report_problem")
+				end
 				initialize_report_problem (req, res)
 			end
 		end
@@ -245,7 +253,7 @@ feature {NONE} -- Update Report Problem
 		end
 
 
-	update_report_problem_internal (req: WSF_REQUEST; a_form: ESA_REPORT_FORM_VIEW; a_type: READABLE_STRING_32)
+	update_report_problem_internal (req: WSF_REQUEST; a_form: ESA_REPORT_FORM_VIEW; a_type: READABLE_STRING_8)
 			-- Update problem report.
 		local
 			l_reproduce: STRING_32
@@ -343,7 +351,7 @@ feature -- Initialize Report Problem
 feature {NONE} -- Implementation
 
 
-	extract_form_data (req: WSF_REQUEST; a_type: READABLE_STRING_32): ESA_REPORT_FORM_VIEW
+	extract_form_data (req: WSF_REQUEST; a_type: READABLE_STRING_8): ESA_REPORT_FORM_VIEW
 			-- Example form parameters
 			--"category=5"
 			--"severity=1"

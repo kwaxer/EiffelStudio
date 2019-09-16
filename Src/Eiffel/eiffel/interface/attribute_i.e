@@ -12,6 +12,7 @@ inherit
 		redefine
 			assigner_name_id,
 			check_expanded,
+			direct_access_for_feature,
 			extension,
 			generate,
 			has_code,
@@ -27,8 +28,7 @@ inherit
 			transfer_from,
 			transfer_to,
 			type,
-			undefinable,
-			unselected
+			undefinable
 		end
 
 	SHARED_DECLARATIONS
@@ -56,45 +56,27 @@ feature -- Access
 	extension: IL_EXTENSION_I
 			-- Deferred external information
 
-	new_rout_entry: ROUT_ENTRY
-			-- New routine unit
+ 	new_rout_entry (t: CLASS_TYPE; d: BOOLEAN; c: like {CLASS_C}.class_id): ROUT_ENTRY
+			-- <Precursor>
 		do
-			create Result
-			Result.set_body_index (body_index)
-			Result.set_type_a (type)
-
-			if generate_in = 0 then
-				if has_replicated_ast then
-					Result.set_access_in (access_in)
-				else
-					Result.set_access_in (written_in)
-				end
-				Result.set_written_in (written_in)
-			else
-				Result.set_written_in (generate_in)
-				Result.set_access_in (generate_in)
-			end
-			Result.set_pattern_id (pattern_id)
-			Result.set_feature_id (feature_id)
+			Result := Precursor (t, d, c)
 			Result.set_is_attribute
 			if has_body then
 				Result.set_has_body
 			end
 		end
 
- 	new_attr_entry: ATTR_ENTRY
- 			-- New attribute unit
+ 	new_attr_entry (t: CLASS_TYPE; d: BOOLEAN; c: like {CLASS_C}.class_id): ATTR_ENTRY
+ 			-- <Precursor>
  		do
- 			create Result
-			Result.set_type_a (type)
- 			Result.set_feature_id (feature_id)
+ 			Result := Precursor (t, d, c)
  			if has_body then
  				Result.set_has_body
  			end
  		end
 
 	undefinable: BOOLEAN
-			-- Is an attribute undefinable ?
+			-- Is an attribute undefinable?
 		do
 			-- Do nothing
 		end
@@ -249,17 +231,32 @@ feature -- Element Change
 
 	access_for_feature (access_type: TYPE_A; static_type: TYPE_A; is_qualified: BOOLEAN; is_separate: BOOLEAN; is_free: BOOLEAN): ACCESS_B
 			-- Byte code access for current feature
+		do
+			if
+				extension = Void and then
+				is_qualified and then
+				system.seed_of_routine_id (rout_id_set.first).has_formal
+			then
+					-- Call a generic wrapper.
+				Result := Precursor (access_type, static_type, is_qualified, is_separate, False)
+			else
+				Result := direct_access_for_feature (access_type, static_type, is_qualified, is_separate, is_free)
+			end
+		end
+
+	direct_access_for_feature (access_type: TYPE_A; static_type: TYPE_A; is_qualified: BOOLEAN; is_separate: BOOLEAN; is_free: BOOLEAN): ACCESS_B
+			-- <Precursor>
 		local
 			attribute_b: ATTRIBUTE_B
 			external_b: EXTERNAL_B
-			l_type: TYPE_A
+			result_type: TYPE_A
 		do
 			if is_qualified then
 					-- To fix eweasel test#term155 we remove all anchors from
 					-- calls after the first dot in a call chain.
-				l_type := access_type.context_free_type
+				result_type := access_type.context_free_type
 			else
-				l_type := access_type
+				result_type := access_type
 			end
 			if extension /= Void then
 				create external_b
@@ -267,16 +264,13 @@ feature -- Element Change
 				if static_type /= Void then
 					external_b.set_static_class_type (static_type)
 				end
-				external_b.set_type (l_type)
+				external_b.set_type (result_type)
 				external_b.set_external_name_id (external_name_id)
 				external_b.set_extension (extension)
 				Result := external_b
-			elseif is_qualified and then system.seed_of_routine_id (rout_id_set.first).has_formal then
-					-- Call a generic wrapper.
-				Result := Precursor (access_type, static_type, is_qualified, is_separate, False)
 			else
 				create attribute_b.make (Current)
-				attribute_b.set_type (l_type)
+				attribute_b.set_type (result_type)
 				Result := attribute_b
 			end
 		end
@@ -464,14 +458,12 @@ feature -- Element Change
 			end
 		end
 
-	generate_hidden_attribute_access, generate_attribute_access (class_type: CLASS_TYPE; buffer: GENERATION_BUFFER)
+	generate_attribute_access (class_type: CLASS_TYPE; buffer: GENERATION_BUFFER)
 			-- Generates attribute access.
 			-- [Redeclaration of a function into an attribute]
 		local
 			result_type: TYPE_A
-			table_name: STRING
 			rout_id: INTEGER
-			array_index: INTEGER
 		do
 			result_type := type.adapted_in (class_type)
 
@@ -486,37 +478,14 @@ feature -- Element Change
 			byte_context.current_register.print_register
 			rout_id := rout_id_set.first
 			if byte_context.final_mode then
-				array_index := Eiffel_table.is_polymorphic (rout_id, class_type.type, class_type, False)
-				if array_index >= 0 then
-					table_name := Encoder.attribute_table_name (rout_id)
-
-						-- Generate following dispatch:
-						-- table [Actual_offset - base_offset]
-					buffer.put_three_character (' ', '+', ' ')
-					buffer.put_string (table_name)
-					buffer.put_character ('[')
-					byte_context.generate_current_dtype
-					buffer.put_three_character (' ', '-', ' ')
-					buffer.put_integer (array_index)
-					buffer.put_character (']')
-						-- Mark attribute offset table used.
-					Eiffel_table.mark_used (rout_id)
-						-- Remember external attribute offset declaration
-					Extern_declarations.add_attribute_table (table_name)
-				else
-						--| In this instruction, we put `False' as second
-						--| arguments. This means we won't generate anything if there is nothing
-						--| to generate. Remember that `True' is used in the generation of attributes
-						--| table in Final mode.
-					class_type.skeleton.generate_offset (buffer, feature_id, False, True)
-				end
+				eiffel_table.generate_offset (rout_id, byte_context.current_register, class_type.type, class_type, buffer)
 			else
 				buffer.put_string (" + RTWA(")
 				buffer.put_integer (rout_id)
 				buffer.put_character (',')
 				byte_context.generate_current_dtype
 				buffer.put_character (')')
-			end;
+			end
 			buffer.put_character(')')
 		end
 
@@ -686,7 +655,7 @@ feature {NONE} -- Implementation
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

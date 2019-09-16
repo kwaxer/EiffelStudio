@@ -201,13 +201,33 @@ feature {NONE} -- Implementation (preparation of all widgets)
 	launch_interface
 		do
 			if preferences.dialog_data.show_first_launching_dialog then
-				display_first_launching_dialog (agent display_startup_page)
+				display_first_launching_dialog (agent display_launching_page)
 			else
-				display_startup_page
+				display_launching_page
 			end
 		end
 
 feature {NONE} -- Welcome dialog
+
+	update_manager_api: ES_UPDATE_MANAGER
+			-- Update manager.
+		do
+			create Result.make (create {ES_UPDATE_CLIENT_CONFIGURATION}.make ({ES_UPDATE_CONSTANTS}.update_service_url))
+		end
+
+	display_launching_page
+		do
+			if
+				is_eiffel_layout_defined and then
+				preferences.dialog_data.show_update_manager_dialog and then
+				attached update_manager_api.available_release_update_for_channel (preferences.misc_data.update_channel,
+										eiffel_layout.eiffel_platform, eiffel_layout.version_name) as l_release
+			then
+				display_update_manager_dialog (l_release, agent display_startup_page)
+			else
+				display_startup_page
+			end
+		end
 
 	display_startup_page
 		local
@@ -300,6 +320,8 @@ feature {NONE} -- Implementation: interface loading
 			debug ("to_implement")
 				(create {REFACTORING_HELPER}).to_implement ("Handle (multiple) -config_option values and pass them to project loader.")
 			end
+-- TODO: why not using the absolute pate?
+--			l_loader.open_project_file (l_config.absolute_path.canonical_path, l_target, l_project_path, index_of_word_option ("clean") /= 0, Void)
 			l_loader.open_project_file (l_config, l_target, l_project_path, index_of_word_option ("clean") /= 0, Void)
 			if
 				not l_loader.has_error and then
@@ -346,8 +368,7 @@ feature {NONE} -- Implementation: interface loading
 		end
 
 	display_first_launching_dialog (cb: detachable PROCEDURE [TUPLE])
-			-- Show the starting dialog letting the user choose where
-			-- his project is (or will be).
+			-- Show the starting dialog , when EiffelStudio is launched for the first time
 			-- And call `cb` when dialog is closed (cancelled or not).
 		local
 			dlg: ES_FIRST_LAUNCHING_DIALOG
@@ -363,6 +384,33 @@ feature {NONE} -- Implementation: interface loading
 				end
 
 				create dlg.make (eiffel_layout.version_name)
+				if cb /= Void then
+					dlg.next_actions.extend (cb)
+				end
+				dlg.show_on_active_window
+			elseif cb /= Void then
+				cb.call (Void)
+			end
+		end
+
+	display_update_manager_dialog (a_release: ES_UPDATE_RELEASE; cb: detachable PROCEDURE [TUPLE])
+			-- Show the starting dialog letting the user choose where
+			-- his project is (or will be).
+			-- And call `cb` when dialog is closed (cancelled or not).
+		local
+			dlg: ES_UPDATE_MANAGER_DIALOG
+			first_window: EB_DEVELOPMENT_WINDOW
+		do
+			if
+				is_eiffel_layout_defined and then
+				eiffel_layout.installed_version_names.count > 1
+			then
+				first_window := window_manager.last_created_window
+				check
+					first_window_not_void: first_window /= Void
+				end
+
+				create dlg.make (a_release)
 				if cb /= Void then
 					dlg.next_actions.extend (cb)
 				end
@@ -465,7 +513,7 @@ feature {NONE} -- Factory
 		end
 
 note
-	copyright: "Copyright (c) 1984-2017, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

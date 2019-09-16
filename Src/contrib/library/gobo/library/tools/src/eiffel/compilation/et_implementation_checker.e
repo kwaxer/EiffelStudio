@@ -5,7 +5,7 @@ note
 		"Eiffel implementation checkers for features and invariants"
 
 	library: "Gobo Eiffel Tools Library"
-	copyright: "Copyright (c) 2003-2016, Eric Bezault and others"
+	copyright: "Copyright (c) 2003-2018, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -21,12 +21,13 @@ inherit
 
 	ET_AST_NULL_PROCESSOR
 		rename
-			make as make_class_processor
-		undefine
-			make_class_processor
+			make as make_ast_processor
 		redefine
 			process_class
 		end
+
+	ET_SHARED_FEATURE_NAME_TESTER
+		export {NONE} all end
 
 create
 
@@ -34,13 +35,17 @@ create
 
 feature {NONE} -- Initialization
 
-	make
+	make (a_system_processor: like system_processor)
 			-- Create a new implementation checker for given classes.
+		require
+			a_system_processor_not_void: a_system_processor /= Void
 		local
 			l_feature_checker: ET_FEATURE_CHECKER
 		do
-			create l_feature_checker.make
+			create l_feature_checker.make (a_system_processor)
 			make_with_feature_checker (l_feature_checker)
+		ensure
+			system_processor_set: system_processor = a_system_processor
 		end
 
 	make_with_feature_checker (a_feature_checker: like feature_checker)
@@ -52,8 +57,14 @@ feature {NONE} -- Initialization
 		local
 			l_suppliers: DS_HASH_SET [ET_NAMED_CLASS]
 		do
-			make_class_processor
+			make_class_processor (a_feature_checker.system_processor)
 			feature_checker := a_feature_checker
+			create named_features.make_map (400)
+			named_features.set_key_equality_tester (feature_name_tester)
+			create feature_adaptation_resolver.make (system_processor)
+			create dotnet_feature_adaptation_resolver.make (system_processor)
+			create signature_checker.make (system_processor)
+			create parent_checker3.make (system_processor)
 			create precursor_procedures.make (10)
 			create precursor_queries.make (10)
 			create l_suppliers.make (10000)
@@ -69,50 +80,22 @@ feature -- Status report
 	flat_mode: BOOLEAN
 			-- Should the inherited features be processed
 			-- again in `current_class'?
+		do
+			Result := system_processor.flat_mode
+		end
 
 	flat_dbc_mode: BOOLEAN
 			-- Should the inherited pre- and postconditions be
 			-- processed again in the redeclaration of features
 			-- in `current_class'?
-
-	short_mode: BOOLEAN
-			-- Process short form of `current_class'
+		do
+			Result := system_processor.flat_dbc_mode
+		end
 
 	suppliers_enabled: BOOLEAN
 			-- Should suppliers of `current_class' be computed?
-
-feature -- Status setting
-
-	set_flat_mode (b: BOOLEAN)
-			-- Set `flat_mode' to `b'.
 		do
-			flat_mode := b
-		ensure
-			flat_mode_set: flat_mode = b
-		end
-
-	set_flat_dbc_mode (b: BOOLEAN)
-			-- Set `flat_dbc_mode' to `b'.
-		do
-			flat_dbc_mode := b
-		ensure
-			flat_dbc_mode_set: flat_dbc_mode = b
-		end
-
-	set_short_mode (b: BOOLEAN)
-			-- Set `short_mode' to `b'.
-		do
-			short_mode := b
-		ensure
-			short_mode_set: short_mode = b
-		end
-
-	set_suppliers_enabled (b: BOOLEAN)
-			-- Set `suppliersproviders_enabled' to `b'.
-		do
-			suppliers_enabled := b
-		ensure
-			suppliers_enabled_set: suppliers_enabled = b
+			Result := system_processor.suppliers_enabled
 		end
 
 feature -- Processing
@@ -127,20 +110,21 @@ feature -- Processing
 			-- the feature `a_class.reset_implementation_checked' needs to be called
 			-- before checking it again in flat mode. No incrementality is provided
 			-- between non-flat and flat modes.
+			--
+			-- Note that in multi-threaded mode, when several system processors
+			-- are processing a Eiffel system together, the implementation of
+			-- `a_class' may still not be checked at the end of this routine if
+			-- it is currently being processed by another system processor.
 		local
 			a_processor: like Current
 		do
 			if a_class.is_none then
-				a_class.set_implementation_checked
+				process_none_class (a_class)
 			elseif not current_class.is_unknown then
 					-- Internal error (recursive call)
 					-- This internal error is not fatal.
 				error_handler.report_giaaa_error
-				create a_processor.make
-				a_processor.set_flat_mode (flat_mode)
-				a_processor.set_flat_dbc_mode (flat_dbc_mode)
-				a_processor.set_short_mode (short_mode)
-				a_processor.set_suppliers_enabled (suppliers_enabled)
+				create a_processor.make (system_processor)
 				a_processor.process_class (a_class)
 			elseif a_class.is_unknown then
 				set_fatal_error (a_class)
@@ -150,12 +134,9 @@ feature -- Processing
 			else
 				internal_process_class (a_class)
 			end
-			if suppliers_enabled and then a_class.suppliers = Void then
-				a_class.set_suppliers (no_suppliers)
-			end
 		ensure then
-			implementation_checked: a_class.implementation_checked
-			suppliers_set: suppliers_enabled implies a_class.suppliers /= Void
+			implementation_checked: not {PLATFORM}.is_thread_capable implies a_class.implementation_checked
+			suppliers_set: a_class.implementation_checked and suppliers_enabled implies a_class.suppliers /= Void
 		end
 
 feature -- Error handling
@@ -165,11 +146,14 @@ feature -- Error handling
 		require
 			a_class_not_void: a_class /= Void
 		do
-			a_class.set_implementation_checked
+			if suppliers_enabled and then a_class.suppliers = Void then
+				a_class.set_suppliers (no_suppliers)
+			end
 			a_class.set_implementation_error
 		ensure
 			implementation_checked: a_class.implementation_checked
 			has_implementation_error: a_class.has_implementation_error
+			suppliers_set: suppliers_enabled implies a_class.suppliers /= Void
 		end
 
 feature {NONE} -- Processing
@@ -184,6 +168,11 @@ feature {NONE} -- Processing
 			-- the feature `a_class.reset_implementation_checked' needs to be called
 			-- before checking it again in flat mode. No incrementality is provided
 			-- between non-flat and flat modes.
+			--
+			-- Note that in multi-threaded mode, when several system processors
+			-- are processing a Eiffel system together, the implementation of
+			-- `a_class' may still not be checked at the end of this routine if
+			-- it is currently being processed by another system processor.
 		require
 			a_class_not_void: a_class /= Void
 			a_class_preparsed: a_class.is_preparsed
@@ -196,64 +185,268 @@ feature {NONE} -- Processing
 			i1, nb1: INTEGER
 			i2, nb2: INTEGER
 			l_parent_clause: ET_PARENT_LIST
+			l_parent_not_checked: BOOLEAN
 		do
 			old_class := current_class
 			current_class := a_class
-			if not current_class.implementation_checked then
-					-- Check interface of `current_class' if not already done.
-				current_class.process (current_system.interface_checker)
-				if current_class.interface_checked and then not current_class.has_interface_error then
-					current_class.set_implementation_checked
-						-- Process parents first.
-					nb1 := current_class.parents_count
-					from i1 := 1 until i1 > nb1 loop
-						l_parent_clause := current_class.parents (i1)
-						nb2 := l_parent_clause.count
-						from i2 := 1 until i2 > nb2 loop
-							a_parent_class := l_parent_clause.parent (i2).type.base_class
-							if not a_parent_class.is_preparsed then
-									-- Internal error: the VTCT error should have already been
-									-- reported in ET_ANCESTOR_BUILDER.
-								a_error_in_parent := True
-								set_fatal_error (current_class)
-							else
-									-- This is a controlled recursive call to `internal_process_class'.
-								internal_process_class (a_parent_class)
-								if a_parent_class.has_implementation_error then
-									a_error_in_parent := True
-									set_fatal_error (current_class)
-								end
-							end
-							i2 := i2 + 1
-						end
-						i1 := i1 + 1
-					end
-					error_handler.report_compilation_status (Current, current_class)
-					if suppliers_enabled then
-						l_suppliers := supplier_builder.supplier_classes
-						supplier_builder.set (current_class, l_suppliers)
-					end
-					check_features_validity (a_error_in_parent)
-					check_invariants_validity (a_error_in_parent)
-					if l_suppliers /= Void then
-						if not current_class.has_implementation_error then
-							create l_suppliers2.make (l_suppliers.count)
-							l_suppliers2.extend (l_suppliers)
-							current_class.set_suppliers (l_suppliers2)
-						else
-							current_class.set_suppliers (no_suppliers)
-						end
-						l_suppliers.wipe_out
-					end
-				else
+			if not {PLATFORM}.is_thread_capable or else current_class.processing_mutex.try_lock then
+					-- No other thread is processing `current_class'.
+					-- Got exclusive access for its processing.
+				if current_class.is_checking_implementation then
+						-- Internal error: this is a recursive call because of a cycle
+						-- in the parents. It should have already been reported in
+						-- ET_ANCESTOR_BUILDER.
 					set_fatal_error (current_class)
+					error_handler.report_giaaa_error
+				elseif not current_class.implementation_checked then
+						-- Check interface of `current_class' if not already done.
+					current_class.process (system_processor.interface_checker)
+					if current_class.interface_checked_successfully then
+						current_class.set_checking_implementation (True)
+							-- Process parents first.
+						nb1 := current_class.parents_count
+						from i1 := 1 until i1 > nb1 loop
+							l_parent_clause := current_class.parents (i1)
+							nb2 := l_parent_clause.count
+							from i2 := 1 until i2 > nb2 loop
+								a_parent_class := l_parent_clause.parent (i2).type.base_class
+								process_parent_class (a_parent_class)
+								if a_parent_class.implementation_checked then
+									if a_parent_class.has_implementation_error then
+										a_error_in_parent := True
+									end
+								else
+									l_parent_not_checked := True
+								end
+								i2 := i2 + 1
+							end
+							i1 := i1 + 1
+						end
+						if l_parent_not_checked then
+								-- When some parents have not been fully checked yet,
+								-- then we postpone the processing of `current_class'.
+							system_processor.report_class_postponed (current_class)
+						else
+							error_handler.report_compilation_status (Current, current_class, system_processor)
+							if a_error_in_parent then
+								set_fatal_error (current_class)
+							end
+							if not current_class.is_dotnet then
+									-- No need to check validity of .NET classes.
+								check_parents_validity
+							end
+							if not current_class.redeclared_signatures_checked then
+									-- An error occurred when checking the conformance of
+									-- redeclared signatures in the feature flattener. This
+									-- could have been caused by the fact that qualified types
+									-- could not be resolved yet. Check the conformance of
+									-- signatures again, and this time reports valid errors
+									-- if any.
+								check_signatures_validity
+							end
+							if suppliers_enabled then
+								l_suppliers := supplier_builder.supplier_classes
+								supplier_builder.set (current_class, l_suppliers)
+							end
+							check_features_validity (a_error_in_parent)
+							check_invariants_validity (a_error_in_parent)
+							if l_suppliers /= Void then
+								if not current_class.has_implementation_error then
+									create l_suppliers2.make (l_suppliers.count)
+									l_suppliers2.extend (l_suppliers)
+									current_class.set_suppliers (l_suppliers2)
+								else
+									current_class.set_suppliers (no_suppliers)
+								end
+								l_suppliers.wipe_out
+							end
+							current_class.set_implementation_checked
+							system_processor.report_class_processed (current_class)
+						end
+						current_class.set_checking_implementation (False)
+					else
+						set_fatal_error (current_class)
+					end
 				end
+				current_class.processing_mutex.unlock
 			end
 			current_class := old_class
 		ensure
-			implementation_checked: a_class.implementation_checked
-			suppliers_set: suppliers_enabled implies a_class.suppliers /= Void
+			implementation_checked: not {PLATFORM}.is_thread_capable implies a_class.implementation_checked
+			suppliers_set: a_class.implementation_checked and suppliers_enabled implies a_class.suppliers /= Void
 		end
+
+	process_parent_class (a_class: ET_CLASS)
+			-- Same as `process_class', except that this is a controlled
+			-- recursive call where `a_class' is a parent of `current_class'.
+		require
+			a_class_not_void: a_class /= Void
+		do
+			if a_class.is_none then
+				process_none_class (a_class)
+			elseif a_class.is_unknown then
+				set_fatal_error (a_class)
+				error_handler.report_giaaa_error
+			elseif not a_class.is_preparsed then
+					-- Internal error: the VTCT error should have already been
+					-- reported in ET_ANCESTOR_BUILDER.
+				set_fatal_error (a_class)
+				error_handler.report_giaaa_error
+			else
+				internal_process_class (a_class)
+			end
+		ensure
+			implementation_checked: not {PLATFORM}.is_thread_capable implies a_class.implementation_checked
+			suppliers_set: a_class.implementation_checked and suppliers_enabled implies a_class.suppliers /= Void
+		end
+
+	process_none_class (a_class: ET_CLASS)
+			-- Process class "NONE".
+		require
+			a_class_not_void: a_class /= Void
+			a_class_is_none: a_class.is_none
+		do
+			if not {PLATFORM}.is_thread_capable or else a_class.processing_mutex.try_lock then
+				if not a_class.implementation_checked then
+					if suppliers_enabled and then a_class.suppliers = Void then
+						a_class.set_suppliers (no_suppliers)
+					end
+					a_class.set_implementation_checked
+					system_processor.report_class_processed (a_class)
+				end
+				a_class.processing_mutex.unlock
+			end
+		ensure
+			implementation_checked: not {PLATFORM}.is_thread_capable implies a_class.implementation_checked
+			suppliers_set: a_class.implementation_checked and suppliers_enabled implies a_class.suppliers /= Void
+		end
+
+feature {NONE} -- Signature validity
+
+	check_signatures_validity
+			-- Check signature validity for redeclarations and joinings
+			-- for all features of `current_class'.
+		do
+			resolve_feature_adaptations
+			if not current_class.has_interface_error then
+				from named_features.start until named_features.after loop
+					check_signature_validity (named_features.item_for_iteration)
+					named_features.forth
+				end
+			end
+			named_features.wipe_out
+		ensure
+			named_features_wiped_out: named_features.is_empty
+		end
+
+	check_signature_validity (a_feature: ET_FLATTENED_FEATURE)
+			-- Check signature validity for redeclarations and joinings for `a_feature'.
+		require
+			a_feature_not_void: a_feature /= Void
+		do
+			signature_checker.check_signature_validity (a_feature, current_class, True)
+			if signature_checker.has_fatal_error then
+				set_fatal_error (current_class)
+			end
+		end
+
+	signature_checker: ET_SIGNATURE_CHECKER
+			-- Signature validity checker
+
+feature {NONE} -- Feature adaptation
+
+	feature_adaptation_resolver: ET_FEATURE_ADAPTATION_RESOLVER
+			-- Feature adaptation resolver
+
+	dotnet_feature_adaptation_resolver: ET_DOTNET_FEATURE_ADAPTATION_RESOLVER
+			-- Feature adaptation resolver for .NET classes
+
+	named_features: DS_HASH_TABLE [ET_FLATTENED_FEATURE, ET_FEATURE_NAME]
+			-- Features indexed by name
+
+	resolve_feature_adaptations
+			-- Resolve the feature adaptations of the inheritance clause of
+			-- `current_class' and put resulting features in `named_features'.
+		do
+			if current_class.is_dotnet then
+				dotnet_feature_adaptation_resolver.resolve_feature_adaptations (current_class, named_features)
+				if dotnet_feature_adaptation_resolver.has_fatal_error then
+					set_fatal_error (current_class)
+				end
+			else
+				feature_adaptation_resolver.resolve_feature_adaptations (current_class, named_features)
+				if feature_adaptation_resolver.has_fatal_error then
+					set_fatal_error (current_class)
+				end
+			end
+			resolve_inherited_features (current_class.queries)
+			resolve_inherited_features (current_class.procedures)
+		end
+
+	resolve_inherited_features (a_feature_list: ET_FEATURE_LIST)
+			-- We have to reconstruct `flattened_feature' and `flattened_parent'
+			-- objects of type ET_INHERITED_FEATURE (these are non-redeclared
+			-- inherited features) as they were when this was first done in
+			-- ET_FEATURE_FLATTENER. In order to achieve that, we made sure
+			-- in ET_FEATURE_FLATTENER that:
+			-- flattened_feature.first_precursor = flattened_parent.precursor_feature.
+		require
+			a_feature_list_not_void: a_feature_list /= Void
+		local
+			l_feature: ET_FEATURE
+			i, nb: INTEGER
+			l_parent_feature: detachable ET_PARENT_FEATURE
+			l_first_precursor: detachable ET_FEATURE
+		do
+			from
+					-- Non-redeclared inherited features are listed from
+					-- `declared_count + 1' to `count' in the feature list.
+				i := a_feature_list.declared_count + 1
+				nb := a_feature_list.count
+			until
+				i > nb
+			loop
+				l_feature := a_feature_list.item (i)
+				named_features.search (l_feature.name)
+				if named_features.found then
+					if attached {ET_INHERITED_FEATURE} named_features.found_item as l_inherited_feature then
+						l_inherited_feature.set_flattened_feature (l_feature)
+						l_parent_feature := l_inherited_feature.parent_feature
+						if l_parent_feature.merged_feature = Void then
+							l_inherited_feature.set_flattened_parent (l_parent_feature)
+						else
+							from
+								l_first_precursor := l_feature.first_precursor
+							until
+								l_parent_feature = Void
+							loop
+								if l_parent_feature.precursor_feature = l_first_precursor then
+									l_inherited_feature.set_flattened_parent (l_parent_feature)
+									l_parent_feature := Void
+								else
+									l_parent_feature := l_parent_feature.merged_feature
+								end
+							end
+						end
+					end
+				end
+				i := i + 1
+			end
+		end
+
+feature {NONE} -- Parents validity
+
+	check_parents_validity
+			-- Check validity of parents of `current_class'.
+		do
+			parent_checker3.check_parents_validity (current_class)
+			if parent_checker3.has_fatal_error then
+				set_fatal_error (current_class)
+			end
+		end
+
+	parent_checker3: ET_PARENT_CHECKER3
+			-- Parent validity checker (third pass)
 
 feature {NONE} -- Feature validity
 
@@ -514,6 +707,12 @@ feature {NONE} -- Suppliers
 
 invariant
 
+	named_features_not_void: named_features /= Void
+	no_void_named_feature: not named_features.has_void_item
+	feature_adaptation_resolver_not_void: feature_adaptation_resolver /= Void
+	dotnet_feature_adaptation_resolver_not_void: dotnet_feature_adaptation_resolver /= Void
+	signature_checker_not_void: signature_checker /= Void
+	parent3_checker_not_void: parent_checker3 /= Void
 	feature_checker_not_void: feature_checker /= Void
 	supplier_builder_not_void: supplier_builder /= Void
 	no_suppliers_not_void: no_suppliers /= Void

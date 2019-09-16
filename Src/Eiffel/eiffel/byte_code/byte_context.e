@@ -402,9 +402,9 @@ feature -- Code generation
 			if use_init then
 				create idx_cnt
 				idx_cnt.set_value (0)
-				l_gen_type.generate_cid_array (l_buffer, final_mode, True, idx_cnt, context_class_type.type)
+				l_gen_type.generate_cid_array (l_buffer, final_mode, True, idx_cnt, context_cl_type)
 			else
-				l_gen_type.generate_cid (l_buffer, final_mode, True, context_class_type.type)
+				l_gen_type.generate_cid (l_buffer, final_mode, True, context_cl_type)
 			end
 			l_buffer.put_hex_natural_16 ({SHARED_GEN_CONF_LEVEL}.terminator_type)
 			l_buffer.put_string ("};")
@@ -424,7 +424,7 @@ feature -- Code generation
 			if use_init then
 					-- Reset counter
 				idx_cnt.set_value (0)
-				l_gen_type.generate_cid_init (l_buffer, final_mode, True, idx_cnt, context_class_type.type, a_level)
+				l_gen_type.generate_cid_init (l_buffer, final_mode, True, idx_cnt, context_cl_type, a_level)
 			end
 
 			l_buffer.put_new_line
@@ -1341,7 +1341,17 @@ feature -- Access
 			else
 				Result := type.formal_instantiated_in (a_context_type)
 				if Result.is_formal then
-					Result := constrained_type_in (Result, a_context_type)
+					Result := constrained_type_in (Result,
+							-- TODO: unify IL and classic evaluation of types.
+						if system.il_generation then
+								-- In IL code, types are sometimes computed in the context of a parent.
+								-- `a_context_type` is where the type is declared.
+							a_context_type
+						else
+								-- In classic code, types are computed in the context of the class being generated.
+								-- `original_class_type` is where the type can be computed.
+							original_class_type.type
+						end)
 				end
 			end
 		ensure
@@ -1564,7 +1574,7 @@ feature -- Access
 	is_ancestor (other: CLASS_TYPE): BOOLEAN
 			-- Is `other' an ancestor of `context_class_type'?
 		do
-			Result := context_class_type.type.is_conformant_to (context_class_type.associated_class, other.type)
+			Result := context_cl_type.is_conformant_to (context_class_type.associated_class, other.type)
 		end
 
 	is_written_context: BOOLEAN
@@ -2546,7 +2556,7 @@ feature -- C code generation: locals
 						l_loc_name.append ("sloc")
 						l_loc_name.append_integer (i)
 						if attached {CL_TYPE_A} type_i as l_type then
-							l_class_type := l_type.associated_class_type (context_class_type.type)
+							l_class_type := l_type.associated_class_type (context_cl_type)
 							l_class_type.generate_expanded_structure_declaration (buf, l_loc_name)
 						else
 							check
@@ -2940,22 +2950,11 @@ feature {NONE} -- Cleanup
 
 feature -- Debugger
 
-	instruction_line: LINE [AST_EIFFEL]
-			-- List of breakable instructions on which a breakpoint may be set.
-
 	breakpoint_slots_number: INTEGER
 			-- current number of breakpoint slots known
 
 	breakpoint_nested_slots_number: INTEGER
 			-- current number of breakpoint nested slots known
-
-	set_instruction_line (l: like instruction_line)
-			-- Assign `l' to `instruction_line' and position FIFO stack at the
-			-- beginning as a side effect, ready for usage by byte code classes.
-		do
-			instruction_line := l
-			l.start
-		end
 
 	get_next_breakpoint_slot: INTEGER
 			-- increase the current number of breakpoint slots and then
@@ -3002,6 +3001,24 @@ feature -- Debugger
 			-- breakable point list (provided we are in debug mode).
 		do
 			ba.prepend (array)
+		end
+
+	increment_breakpoint_slot_for_assertion (a_node: BYTE_NODE)
+			-- Update breakpoint slot index when generating finalized C Code
+			-- if assertions are not kept, and exception stack enabled.
+		require
+			final_mode: final_mode
+			assertions_not_kept: not system.keep_assertions
+			exception_stack_managed: system.exception_stack_managed
+		do
+			assertion_breakable_slot_strategy.update_breakpoint_slot (a_node, Current)
+		end
+
+feature {NONE} -- Debugger		
+
+	assertion_breakable_slot_strategy: ASSERTION_BREAKABLE_SLOT_STRATEGY
+		once
+			create Result
 		end
 
 feature -- Inlining
@@ -3155,7 +3172,7 @@ invariant
 note
 	date: "$Date$"
 	revision: "$Revision$"
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

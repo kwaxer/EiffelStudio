@@ -27,11 +27,24 @@ feature -- Access
 	options: CONF_TARGET_OPTION
 			-- Options (Debuglevel, assertions, ...)
 		do
-			if attached internal_options as l_internal_options then
-				Result := l_internal_options
-			else
+			Result := internal_options
+			if not attached Result then
 				create Result
 			end
+		end
+
+	adapted_options: CONF_TARGET_OPTION
+			-- Options adapted to the current project.
+		do
+			Result := forced_options
+			if not attached Result then
+				Result := internal_options
+				if not attached Result then
+					create Result
+				end
+			end
+		ensure
+			Result_not_void: Result /= Void
 		end
 
 	settings: STRING_TABLE [READABLE_STRING_32]
@@ -44,10 +57,11 @@ feature -- Access
 
 feature -- Access: settings
 
-	setting_boolean (a_name: STRING): BOOLEAN
-			-- Get value of boolean setting with `a_name'.
+	setting_boolean (a_name: READABLE_STRING_8; n: like {CONF_FILE_CONSTANTS}.latest_namespace): BOOLEAN
+			-- Get value of boolean setting with `a_name` in the namespace `n`.
 		require
 			a_name_valid: is_boolean_setting_known (a_name)
+			is_namespace_known (n)
 		local
 			l_settings: like settings
 		do
@@ -58,86 +72,8 @@ feature -- Access: settings
 					Result := l_found_item.to_boolean
 				end
 			else
-				Result := true_boolean_settings.has (a_name)
+				Result := is_boolean_setting_true (a_name, n)
 			end
-		end
-
-	setting_absent_explicit_assertion: BOOLEAN
-			-- Value of the setting "absent_explicit_assertion".
-		do
-			Result := setting_boolean (s_absent_explicit_assertion)
-		end
-
-	setting_address_expression: BOOLEAN
-			-- Value of the address_expression setting.
-		do
-			Result := setting_boolean (s_address_expression)
-		end
-
-	setting_array_optimization: BOOLEAN
-			-- Value of the array_optimization setting.
-		do
-			Result := setting_boolean (s_array_optimization)
-		end
-
-	setting_automatic_backup: BOOLEAN
-			-- Value for the automatic_backup setting.
-		do
-			Result := setting_boolean (s_automatic_backup)
-		end
-
-	setting_check_for_void_target: BOOLEAN
-			-- Value for the `check_for_void_target' setting.
-		do
-			Result := setting_boolean (s_check_for_void_target)
-		end
-
-	setting_check_for_catcall_at_runtime: BOOLEAN
-			-- Value for the `check_for_catcall_at_runtime' setting.
-		do
-			Result := setting_boolean (s_check_for_catcall_at_runtime)
-		end
-
-	setting_check_generic_creation_constraint: BOOLEAN
-			-- Value of the check_generic_creation_constraint setting.
-		do
-			Result := setting_boolean (s_check_generic_creation_constraint)
-		end
-
-	setting_check_vape: BOOLEAN
-			-- Value for the check_vape setting.
-		do
-			Result := setting_boolean (s_check_vape)
-		end
-
-	setting_console_application: BOOLEAN
-			-- Value for the console_application setting.
-		do
-			Result := setting_boolean (s_console_application)
-		end
-
-	setting_cls_compliant: BOOLEAN
-			-- Value for the cls_compliant setting.
-		do
-			Result := setting_boolean (s_cls_compliant)
-		end
-
-	setting_dead_code_removal: BOOLEAN
-			-- Value for the dead_code_removal setting.
-		do
-			Result := setting_boolean (s_dead_code_removal)
-		end
-
-	setting_dotnet_naming_convention: BOOLEAN
-			-- Value for the dotnet_naming_convention setting.
-		do
-			Result := setting_boolean (s_dotnet_naming_convention)
-		end
-
-	setting_dynamic_runtime: BOOLEAN
-			-- Value for the dynamic_runtime setting.
-		do
-			Result := setting_boolean (s_dynamic_runtime)
 		end
 
 	setting_executable_name: STRING_32
@@ -152,36 +88,6 @@ feature -- Access: settings
 			Result_not_void: Result /= Void
 		end
 
-	setting_enforce_unique_class_names: BOOLEAN
-			-- Valeu for the enforce_unique_class_names setting.
-		do
-			Result := setting_boolean (s_enforce_unique_class_names)
-		end
-
-	setting_exception_trace: BOOLEAN
-			-- Value for the exception_trace setting.
-		do
-			Result := setting_boolean (s_exception_trace)
-		end
-
-	setting_force_32bits: BOOLEAN
-			-- Value for the force_32bits setting.
-		do
-			Result := setting_boolean (s_force_32bits)
-		end
-
-	setting_il_verifiable: BOOLEAN
-			-- Value for the console_application setting.
-		do
-			Result := setting_boolean (s_il_verifiable)
-		end
-
-	setting_inlining: BOOLEAN
-			-- Value for the inlining setting.
-		do
-			Result := setting_boolean (s_inlining)
-		end
-
 	setting_inlining_size: NATURAL_8
 			-- Value for the inlining_size setting.
 		do
@@ -191,18 +97,6 @@ feature -- Access: settings
 			else
 				Result := 4
 			end
-		end
-
-	setting_java_generation: BOOLEAN
-			-- Value for the java_generation setting.
-		do
-			Result := setting_boolean (s_java_generation)
-		end
-
-	setting_line_generation: BOOLEAN
-			-- Value for the line_generation setting.
-		do
-			Result := setting_boolean (s_line_generation)
 		end
 
 	setting_metadata_cache_path: STRING_32
@@ -252,12 +146,6 @@ feature -- Access: settings
 			Result_not_void: Result /= Void
 		end
 
-	setting_msil_generation: BOOLEAN
-			-- Value for the msil_generation setting.
-		do
-			Result := setting_boolean (s_msil_generation)
-		end
-
 	setting_msil_generation_type: STRING_32
 			-- Value for the msil_generation_type setting.
 		do
@@ -281,12 +169,6 @@ feature -- Access: settings
 			end
 		ensure
 			Result_not_void: Result /= Void
-		end
-
-	setting_msil_use_optimized_precompile: BOOLEAN
-			-- Value for the msil_use_optimized_precompile setting.
-		do
-			Result := setting_boolean (s_msil_use_optimized_precompile)
 		end
 
 	setting_platform: STRING_32
@@ -326,24 +208,6 @@ feature -- Access: settings
 			Result_not_void: Result /= Void
 		end
 
-	setting_total_order_on_reals: BOOLEAN
-			-- Value for the total_order_on_reals setting.
-		do
-			Result := setting_boolean (s_total_order_on_reals)
-		end
-
-	setting_use_cluster_name_as_namespace: BOOLEAN
-			-- Value for the use_cluster_name_as_namespace setting.
-		do
-			Result := setting_boolean (s_use_cluster_name_as_namespace)
-		end
-
-	setting_use_all_cluster_name_as_namespace: BOOLEAN
-			-- Value for the use_all_cluster_name_as_namespace setting.
-		do
-			Result := setting_boolean (s_use_all_cluster_name_as_namespace)
-		end
-
 feature -- Modification
 
 	force (other: CONF_TARGET_SETTINGS)
@@ -369,6 +233,21 @@ feature {CONF_ACCESS} -- Update, stored in configuration file
 			option_set: internal_options = an_option
 		end
 
+	merge_options (an_option: like options)
+			-- If `internal_options` is already set, merge `an_option` with it,
+			-- otherwise set the options to `an_option`.
+		require
+			an_option_not_void: an_option /= Void
+		do
+			if attached internal_options as l_opts then
+				l_opts.merge (an_option)
+			else
+				internal_options := an_option
+			end
+		ensure
+			option_set: internal_options /= Void
+		end
+
 	set_settings (a_settings: like settings)
 			-- Set `a_settings'.
 		require
@@ -388,6 +267,30 @@ feature {CONF_ACCESS} -- Update, stored in configuration file
 			internal_settings.force (a_value, a_name)
 		ensure
 			added: internal_settings.item (a_name) = a_value
+		end
+
+	add_capability (a_name, a_value: READABLE_STRING_32)
+			-- Add a new setting.
+		require
+			a_name_ok: a_name /= Void and then not a_name.is_empty
+			a_value_not_void: a_value /= Void
+		local
+			l_opts: like internal_options
+		do
+			l_opts := internal_options
+			if a_name.is_case_insensitive_equal_general (s_concurrency) then
+				if l_opts = Void then
+					create l_opts
+					internal_options := l_opts
+				end
+				l_opts.concurrency.put (a_value)
+			elseif a_name.is_case_insensitive_equal_general (s_void_safety) then
+				if l_opts = Void then
+					create l_opts
+					internal_options := l_opts
+				end
+				l_opts.void_safety.put (a_value)
+			end
 		end
 
 	update_setting (a_name: READABLE_STRING_32; a_value: detachable READABLE_STRING_32)
@@ -422,14 +325,27 @@ feature {CONF_VISITOR, CONF_ACCESS} -- Implementation, attributes that are store
 			Result_not_void: Result /= Void
 		end
 
+	forced_options: like internal_options
+			-- Same as `internal_options`, but forced by a third-party (client, precompile, etc.) project,
+			-- not by the original one.
+
 	internal_settings: like settings
 			-- Settings of this target itself.
+
+feature {CONF_VISITOR} -- Modification
+
+	force_options (o: like options)
+		do
+			forced_options := o
+		ensure
+			forced_options = o
+		end
 
 invariant
 	internal_settings_attached: attached internal_settings
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

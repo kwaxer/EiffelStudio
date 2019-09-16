@@ -2,7 +2,6 @@ note
 	description: "Object that represents a group item used in Eiffel query language"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
-	author: ""
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -11,11 +10,6 @@ class
 
 inherit
 	QL_ITEM
-		redefine
-			name,
-			is_compiled,
-			wrapped_domain
-		end
 
 create
 	make,
@@ -128,15 +122,15 @@ feature -- Access
 			group_is_library: group.is_library
 		local
 			l_domain_generator: QL_TARGET_DOMAIN_GENERATOR
-			l_target_domain: QL_TARGET_DOMAIN
 		do
 			create l_domain_generator
 			l_domain_generator.enable_fill_domain
-			l_target_domain ?= wrapped_domain.new_domain (l_domain_generator)
 			check
-				l_target_domain /= Void and then l_target_domain.count = 1
+				new_domain_has_one_target: attached {QL_TARGET_DOMAIN} wrapped_domain.new_domain (l_domain_generator) as l_target_domain and then
+				l_target_domain.count = 1
+			then
+				Result := l_target_domain.first
 			end
-			Result := l_target_domain.first
 		ensure
 			result_attached: Result /= Void
 		end
@@ -150,7 +144,9 @@ feature -- Access
 		do
 			create l_group_domain_generator
 			l_group_domain_generator.enable_fill_domain
-			Result ?= library_target.wrapped_domain.new_domain (l_group_domain_generator)
+			check attached {like groups_in_target} library_target.wrapped_domain.new_domain (l_group_domain_generator) as gd then
+				Result := gd
+			end
 		ensure
 			result_attached: Result /= Void
 		end
@@ -228,7 +224,7 @@ invariant
 	parent_valid: parent /= Void implies ((parent.is_group or parent.is_target) and (parent.is_valid_domain_item))
 
 note
-	copyright: "Copyright (c) 1984-2013, Eiffel Software"
+	copyright: "Copyright (c) 1984-2018, Eiffel Software"
 	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

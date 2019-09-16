@@ -19,7 +19,6 @@ inherit
 	EB_TOOLBARABLE_AND_MENUABLE_COMMAND
 		redefine
 			new_sd_toolbar_item,
-			pixel_buffer,
 			mini_pixmap,
 			mini_pixel_buffer
 		end
@@ -95,10 +94,14 @@ feature {NONE} -- Access
 
 feature {NONE} -- Helpers
 
-	frozen stock_pixmaps: ES_PIXMAPS_16X16
-			-- Shared access to stock 16x16 EiffelStudio pixmaps.
-		once
-			Result := (create {EB_SHARED_PIXMAPS}).icon_pixmaps
+	frozen stock_pixmaps: ES_ICONS
+			-- Access to stock dpi based EiffelStudio pixmaps.
+		do
+				-- TODO review
+				-- updated once feature to load icon_pixmap based on the Monitor DPI.
+				-- using object-less call
+				-- Date 05/24/2019	
+			Result := {EB_SHARED_PIXMAPS}.icon_pixmaps
 		ensure
 			result_attached: Result /= Void
 		end
@@ -157,7 +160,7 @@ invariant
 	tool_type_attached: not is_recycled implies tool_type /= Void
 
 ;note
-	copyright: "Copyright (c) 1984-2017, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[
@@ -181,11 +184,11 @@ invariant
 			Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 		]"
 	source: "[
-			 Eiffel Software
-			 5949 Hollister Ave., Goleta, CA 93117 USA
-			 Telephone 805-685-1006, Fax 805-685-6869
-			 Website http://www.eiffel.com
-			 Customer support http://support.eiffel.com
+			Eiffel Software
+			5949 Hollister Ave., Goleta, CA 93117 USA
+			Telephone 805-685-1006, Fax 805-685-6869
+			Website http://www.eiffel.com
+			Customer support http://support.eiffel.com
 		]"
 
 end

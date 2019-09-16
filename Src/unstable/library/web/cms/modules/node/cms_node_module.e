@@ -96,7 +96,7 @@ feature {CMS_API} -- Module management
 				l_sql_storage.sql_execute_file_script (a_api.module_resource_location (Current, (create {PATH}.make_from_string ("scripts")).extended (name).appended_with_extension ("sql")), Void)
 
 				if l_sql_storage.has_error then
-					a_api.logger.put_error ("Could not initialize database for module [" + name + "]", generating_type)
+					a_api.report_error ("[" + name + "]: installation failed!", l_sql_storage.error_handler.as_string_representation)
 				else
 					Precursor {CMS_MODULE} (a_api)
 				end
@@ -188,8 +188,10 @@ feature -- Access: router
 			a_router.map (l_uri_mapping, a_router.methods_get_post)
 
 			a_router.handle ("/node/add/{type}", l_node_handler, a_router.methods_get_post)
+			a_router.handle ("/node/preview/{type}", l_node_handler, a_router.methods_post)
 			a_router.handle ("/node/{id}/revision", l_node_handler, a_router.methods_get)
 			a_router.handle ("/node/{id}/edit", l_node_handler, a_router.methods_get_post)
+			a_router.handle ("/node/{id}/preview", l_node_handler, a_router.methods_post)
 			a_router.handle ("/node/{id}/delete", l_node_handler, a_router.methods_get_post)
 			a_router.handle ("/node/{id}/trash", l_node_handler, a_router.methods_get_post)
 
@@ -231,6 +233,9 @@ feature -- Hooks
 			-- <Precursor>
 		do
 			a_response.add_style (a_response.module_resource_url (Current, "/files/css/node.css", Void), Void)
+			if attached {NODE_FORM_RESPONSE} a_response then
+				a_response.add_javascript_url (a_response.module_resource_url (Current, "/files/js/node_form.js", Void))
+			end
 		end
 
 	block_list: ITERABLE [like {CMS_BLOCK}.name]
@@ -314,6 +319,7 @@ feature -- Hooks
 				l_nodes := l_node_api.recent_node_changes_before (params, l_date)
 				across l_nodes as ic loop
 					n := ic.item
+					a_changes.set_last_date_for_source (n.modification_date, n.content_type)
 					if l_src = Void or else l_src.is_case_insensitive_equal_general (n.content_type) then
 						if l_node_api.has_permission_for_action_on_node ("view", n, a_current_user) then
 							n := l_node_api.full_node (n)
@@ -350,7 +356,11 @@ feature -- Hooks
 									end
 								end
 							end
-							a_changes.force (ch)
+							if a_changes.has_expected_author (ch) then
+								a_changes.force (ch)
+							else
+									-- filtered out.
+							end
 						else
 							-- Forbidden
 							-- FIXME: provide a visual indication!

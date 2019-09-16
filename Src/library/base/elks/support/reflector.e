@@ -93,22 +93,22 @@ feature -- Creation
 			dynamic_type_set: attached_type (Result.generating_type.type_id) = attached_type (type_id)
 		end
 
-	new_special_any_instance (type_id, count: INTEGER): SPECIAL [detachable ANY]
+	new_special_any_instance (type_id, a_capacity: INTEGER): SPECIAL [detachable ANY]
 			-- New instance of dynamic `type_id' that represents
-			-- a SPECIAL with `count' element. To create a SPECIAL of
-			-- basic type, use `SPECIAL'.
+			--  a SPECIAL which can contain `a_capacity' elements of reference type.
+			-- To create a SPECIAL of basic type, use class SPECIAL directly.
 		require
-			count_valid: count >= 0
+			a_capacity_valid: a_capacity >= 0
 			type_id_nonnegative: type_id >= 0
 			special_type: is_special_any_type (type_id)
 		do
-			create Result.make_empty (count)
+			create Result.make_empty (a_capacity)
 			c_set_dynamic_type (Result, type_id)
 		ensure
 			instance_free: class
 			dynamic_type_set: Result.generating_type.type_id = type_id
 			count_set: Result.count = 0
-			capacity_set: Result.capacity = count
+			capacity_set: Result.capacity = a_capacity
 		end
 
 	new_tuple_from_special (type_id: INTEGER; values: SPECIAL [detachable separate ANY]): detachable TUPLE
@@ -212,9 +212,7 @@ feature -- Status report
 		require
 			type_id_nonnegative: type_id >= 0
 		external
-			"C signature (EIF_INTEGER): EIF_BOOLEAN use %"eif_internal.h%""
-		alias
-			"eif_special_any_type"
+			"built_in static"
 		ensure
 			instance_free: class
 		end
@@ -222,13 +220,12 @@ feature -- Status report
 	is_special_type (type_id: INTEGER): BOOLEAN
 			-- Is type represented by `type_id' represent
 			-- a SPECIAL [XX] where XX is a reference type
-			-- or a basic type.
+			-- or a basic expanded type (note that user-defined
+			-- expanded types are excluded).
 		require
 			type_id_nonnegative: type_id >= 0
 		external
-			"C signature (EIF_INTEGER): BOOLEAN use %"eif_internal.h%""
-		alias
-			"eif_is_special_type"
+			"built_in static"
 		ensure
 			instance_free: class
 		end
@@ -238,9 +235,7 @@ feature -- Status report
 		require
 			type_id_nonnegative: type_id >= 0
 		external
-			"C signature (EIF_INTEGER): BOOLEAN use %"eif_internal.h%""
-		alias
-			"eif_is_tuple_type"
+			"built_in static"
 		ensure
 			instance_free: class
 		end
@@ -423,9 +418,7 @@ feature -- Measurement
 		require
 			type_id_nonnegative: type_id >= 0
 		external
-			"C macro signature (EIF_INTEGER): EIF_INTEGER use %"eif_internal.h%""
-		alias
-			"ei_count_field_of_type"
+			"built_in static"
 		ensure
 			instance_free: class
 		end
@@ -467,9 +460,7 @@ feature {NONE} -- Implementation
 			-- `type_id' cannot represent a SPECIAL type, use
 			-- `new_special_any_instance' instead.	
 		external
-			"C inline use %"eif_macros.h%""
-		alias
-			"return RTLNSMART(eif_decoded_type($type_id).id);"
+			"built_in static"
 		ensure
 			instance_free: class
 		end
@@ -479,9 +470,7 @@ feature {NONE} -- Implementation
 			-- Note: returned object is not initialized and may
 			-- hence violate its invariant.
 		external
-			"C inline use %"eif_macros.h%""
-		alias
-			"return RTLNT(eif_decoded_type($type_id).id);"
+			"built_in static"
 		ensure
 			instance_free: class
 		end
@@ -489,9 +478,7 @@ feature {NONE} -- Implementation
 	c_new_type_instance_of (type_id: INTEGER): TYPE [detachable ANY]
 			-- New instance of TYPE for object of type `type_id'.
 		external
-			"C inline use %"eif_macros.h%""
-		alias
-			"return eif_type_malloc(eif_decoded_type($type_id), 0);"
+			"built_in static"
 		ensure
 			instance_free: class
 		end
@@ -505,7 +492,7 @@ feature {NONE} -- Implementation
 		end
 
 note
-	copyright: "Copyright (c) 1984-2018, Eiffel Software and others"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software and others"
 	license:   "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software

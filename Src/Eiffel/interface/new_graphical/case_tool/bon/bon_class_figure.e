@@ -1,8 +1,9 @@
-note
+﻿note
 	description: "Objects that represent a BON view for an EIFFEL_CLASS"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
 	author: "Benno Baumgartner"
+	revised_by: "Alexander Kogtenkov"
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -15,9 +16,7 @@ inherit
 			is_storable
 		redefine
 			default_create,
-			update,
 			set_name_label_text,
-			set_is_selected,
 			recursive_transform,
 			world,
 			xml_node_name,
@@ -565,7 +564,7 @@ feature {NONE} -- Implementation
 			request_update
 		end
 
-	set_name_label_text (a_text: STRING)
+	set_name_label_text (a_text: READABLE_STRING_32)
 			-- Set texts in `name_labels'.
 			-- | With line wrap at `max_class_name_length'.
 		local
@@ -979,7 +978,7 @@ invariant
 	generics_label_not_void: generics_label /= Void
 
 note
-	copyright:	"Copyright (c) 1984-2014, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[
@@ -1010,4 +1009,4 @@ note
 			Customer support http://support.eiffel.com
 		]"
 
-end -- class BON_CLASS_FIGURE
+end

@@ -110,8 +110,8 @@ feature{NONE} -- Initialization
 
 			create l_locale_text.make_with_text (interface_names.l_locale)
 
-			l_ev_empty_lbl.set_minimum_height (State_bar_height)
-			l_ev_empty_lbl.set_minimum_width (State_bar_height * 2)
+			l_ev_empty_lbl.set_minimum_height ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (State_bar_height))
+			l_ev_empty_lbl.set_minimum_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (State_bar_height) * 2)
 			l_ev_horizontal_box_7.extend (l_ev_empty_lbl)
 			l_ev_horizontal_box_7.disable_item_expand (l_ev_empty_lbl)
 			output_toolbar.extend (save_output_btn)
@@ -141,15 +141,15 @@ feature{NONE} -- Initialization
 			l_ev_horizontal_box_2.extend (l_ev_cmd_lbl)
 			l_ev_horizontal_box_2.extend (cmd_lst)
 			create l_cell
-			l_cell.set_minimum_width (5)
+			l_cell.set_minimum_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (5))
 			l_ev_horizontal_box_2.extend (l_cell)
 			l_ev_horizontal_box_2.disable_item_expand (l_cell)
 			l_ev_horizontal_box_2.extend (l_locale_text)
 			l_ev_horizontal_box_2.disable_item_expand (l_locale_text)
 			l_ev_horizontal_box_2.extend (locale_combo)
-			locale_combo.set_minimum_width (200)
+			locale_combo.set_minimum_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (200))
 			l_ev_horizontal_box_2.disable_item_expand (locale_combo)
-			l_ev_horizontal_box_2.set_padding_width (5)
+			l_ev_horizontal_box_2.set_padding_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (5))
 			l_ev_horizontal_box_5.extend (cmd_toolbar)
 			l_ev_horizontal_box_5.extend (toolbar)
 			l_ev_horizontal_box_5.disable_item_expand (toolbar)
@@ -179,8 +179,8 @@ feature{NONE} -- Initialization
 			l_ev_horizontal_box_4.extend (state_label)
 			l_ev_vertical_box_1.disable_item_expand (l_ev_horizontal_box_1)
 			l_ev_vertical_box_1.disable_item_expand (l_ev_horizontal_box_4)
-			l_ev_vertical_box_1.set_padding (4)
-			l_ev_vertical_box_1.set_border_width (4)
+			l_ev_vertical_box_1.set_padding ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (4))
+			l_ev_vertical_box_1.set_border_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (4))
 
 			del_cmd_btn.set_pixmap (stock_pixmaps.general_delete_icon)
 			del_cmd_btn.set_pixel_buffer (stock_pixmaps.general_delete_icon_buffer)
@@ -365,7 +365,6 @@ feature -- Basic operation
 			-- should be selected as defaulted.
 		local
 			ms: HASH_TABLE [EB_EXTERNAL_COMMAND, INTEGER]
-			ext_cmd: EB_EXTERNAL_COMMAND
 			lst_item: EV_LIST_ITEM
 			str: STRING_32
 			text_set: BOOLEAN
@@ -380,14 +379,13 @@ feature -- Basic operation
 				until
 					ms.after
 				loop
-					ext_cmd ?= ms.item_for_iteration
-					if ext_cmd /= Void then
+					if attached {EB_EXTERNAL_COMMAND} ms.item_for_iteration as ext_cmd then
 						create lst_item.make_with_text (ext_cmd.external_command)
 
 						lst_item.set_data (ext_cmd)
 						lst_item.set_tooltip (ext_cmd.name)
 						cmd_lst.extend (lst_item)
-						if  selected_cmd /= Void and then lst_item.data = selected_cmd then
+						if selected_cmd /= Void and then lst_item.data = selected_cmd then
 							lst_item.enable_select
 							cmd_lst.set_text (selected_cmd.external_command)
 							text_set := True
@@ -406,11 +404,8 @@ feature -- Basic operation
 
 --	process_block_text (text_block: EB_PROCESS_IO_DATA_BLOCK) is
 --			-- Print `text_block' on `output_text'.
---		local
---			str: STRING
 --		do
---			str ?= text_block.data
---			if str /= Void then
+--			if attached {STRING} text_block.data as str then
 --				output_text.append_text (source_encoding.convert_to (destination_encoding, str))
 --			end
 --		end
@@ -657,27 +652,21 @@ feature{NONE} -- Actions
 	on_stone_dropped_at_cmd_list (a_pebble: ANY)
 			-- Action to be performed when `a_pebble' is dropped at `cmd_lst'
 		local
-			l_classi_stone: CLASSI_STONE
-			l_feature_stone: FEATURE_STONE
-			l_group_stone: CLUSTER_STONE
 			l_done: BOOLEAN
 			l_new_text: READABLE_STRING_GENERAL
 		do
-			l_feature_stone ?= a_pebble
-			if l_feature_stone /= Void then
+			if attached {FEATURE_STONE} a_pebble as l_feature_stone then
 				l_new_text := {STRING_32} "{" + l_feature_stone.class_name + "}." + l_feature_stone.feature_name
 				l_done := True
 			end
 			if not l_done then
-				l_classi_stone ?= a_pebble
-				if l_classi_stone /= Void then
+				if attached {CLASSI_STONE} a_pebble as l_classi_stone then
 					l_new_text := {STRING_32} "{" + l_classi_stone.class_name + "}"
 					l_done := True
 				end
 			end
 			if not l_done then
-				l_group_stone ?= a_pebble
-				if l_group_stone /= Void then
+				if attached {CLUSTER_STONE} a_pebble as l_group_stone then
 					l_new_text := l_group_stone.group.location.evaluated_path.name
 				end
 			end
@@ -698,9 +687,8 @@ feature -- Status reporting
 			-- otherwise return Void.
 		local
 			str: STRING_32
-			e_cmd: EB_EXTERNAL_COMMAND
-			done: BOOLEAN
 			l_commands: HASH_TABLE [EB_EXTERNAL_COMMAND, INTEGER]
+			e_cmd: EB_EXTERNAL_COMMAND
 		do
 			create str.make_from_string (cmd_lst.text)
 			str.left_adjust
@@ -709,27 +697,22 @@ feature -- Status reporting
 				from
 					l_commands := develop_window.commands.edit_external_commands_cmd.commands
 					l_commands.start
-					done := False
 				until
-					l_commands.after or done
+					l_commands.after or e_cmd /= Void
 				loop
-					e_cmd ?= l_commands.item_for_iteration
-					if e_cmd /= Void then
-						if e_cmd.external_command.is_equal (str) then
-							done := True
-						end
+					if
+						attached {EB_EXTERNAL_COMMAND} l_commands.item_for_iteration as l_ext_cmd and then
+						l_ext_cmd.external_command.same_string (str)
+					then
+						e_cmd := l_ext_cmd
 					end
 					l_commands.forth
 				end
 			end
-			if done then
-				Result := e_cmd
-			else
-				Result := Void
-			end
+			Result := e_cmd
 		end
 
-	is_general: BOOLEAN = false;
+	is_general: BOOLEAN = False;
 
 feature -- State setting
 
@@ -847,13 +830,11 @@ feature {NONE} -- Implementation
 			-- Set focus on idle actions.
 		local
 			l_env: EV_ENVIRONMENT
-			l_container: EV_CONTAINER
 			l_focused_already: BOOLEAN
 			l_widget: EV_WIDGET
 		do
 			create l_env
-			l_container ?= widget
-			if l_container /= Void then
+			if attached {EV_CONTAINER} widget as l_container then
 				if not l_env.application.is_destroyed then
 					l_widget := l_env.application.focused_widget
 				end
@@ -875,7 +856,7 @@ feature {NONE} -- Implementation
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

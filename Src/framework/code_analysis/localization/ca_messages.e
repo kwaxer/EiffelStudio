@@ -353,12 +353,6 @@ feature -- Rule Violations
 	unneeded_object_test_violation_2: STRING_32
 		do Result := translation_in_context ("' is already of the static type '", once "code_analyzer.violation") end
 
-	variable_not_read_violation_1: STRING_32
-		do Result := translation_in_context ("The local variable '", once "code_analyzer.violation") end
-
-	variable_not_read_violation_2: STRING_32
-		do Result := translation_in_context ("' is not read / used before it gets reassigned or out of scope.", once "code_analyzer.violation") end
-
 	semicolon_arguments_violation_1: STRING_32
 		do Result := translation_in_context ("Some arguments of routine '", once "code_analyzer.violation") end
 
@@ -618,7 +612,7 @@ feature -- Command Line
 		do Result := translation_in_context ("%NIn class '", once "code_analyzer.command") end
 
 	cmd_help_message: STRING_32
-		do Result := translation_in_context ("Eiffel Inspector performs static analyses on the source code and %
+		do Result := translation_in_context ("Code Analyzer performs static analyses on the source code and %
 			           %outputs a list of issues found according to a set of rules.", once "code_analyzer.command") end
 
 	cmd_class_not_found_1: STRING_32

@@ -8,7 +8,6 @@ inherit
 		undefine
 			allocates_memory,
 			analyze_on,
-			call_kind,
 			current_needed_for_access,
 			enlarged,
 			enlarged_on,
@@ -24,17 +23,18 @@ inherit
 			is_feature_call,
 			is_special_feature,
 			is_unsafe,
-			need_target,
-			set_call_kind
+			need_target
 		redefine
 			analyze,
 			basic_register,
+			call_kind,
 			free_register,
 			generate_parameters,
 			has_one_signature,
 			is_polymorphic,
 			parent,
 			register,
+			set_call_kind,
 			set_parent,
 			set_register
 		end
@@ -67,31 +67,25 @@ feature -- Modification
 			parent := p
 		end
 
+feature {CALL_B} -- Kind of a call: status
+
+	call_kind: INTEGER
+			-- <Precursor>
+
+feature {CALL_B} -- Kind of a call: modification
+
+	set_call_kind (value: like call_kind)
+			-- <Precursor>
+		do
+			call_kind := value
+		end
+
 feature -- Code generation
 
 	analyze
 			-- Build a proper context for code generation.
-		local
-			c: like instance_free_creation
 		do
-			if is_class_target_needed then
-					-- Generate an empty object to be used as a target of the call.
-				check
-					instance_free_call_has_precursor_type: attached precursor_type as p
-				then
-					create c
-					c.set_info (p.create_info)
-					c.set_type (p)
-					if attached multi_constraint_static as t then
-						c.set_multi_constraint_static (t)
-					end
-					c.analyze
-					analyze_on (c.register)
-					instance_free_creation := c
-				end
-			else
-				analyze_on (Current_register)
-			end
+			analyze_on (current_register)
 			get_register
 		end
 
@@ -107,6 +101,21 @@ feature -- Code generation
 			end
 		end
 
+	generate_access
+			-- Generate access call of feature on `current_register` or a special register to call instance-free feature.
+		do
+			generate_on (current_register)
+		end
+
+	generate_on (reg: REGISTRABLE)
+			-- Generate call of the feature on `reg`.
+		do
+				-- Reset variables
+			is_right_parenthesis_needed.put (False)
+			is_deferred.put (False)
+			do_generate (target_register (reg))
+		end
+
 	generate_parameters (reg: REGISTRABLE)
 			-- <Precursor>
 			-- Prepare an instance-free target if needed.
@@ -117,16 +126,96 @@ feature -- Code generation
 			end
 		end
 
+feature {NONE} -- Target register
+
+	target_register (r: REGISTRABLE): REGISTRABLE
+			-- A target register of the feature call performed on the target `r`.
+			-- It may be different for instance-free calls that depend on `r` indirectly.
+		do
+			Result := if attached instance_free_creation as c then c.register else r end
+		end
+
+	analyze_non_object_call_target
+			-- Analyze non-object call target (if any), initialize associated target creation code
+			-- and allocate a necessary target register.
+		local
+			c: like instance_free_creation
+		do
+			if is_class_target_needed then
+					-- Generate an empty object to be used as a target of the call.
+				check
+					instance_free_call_has_precursor_type: attached precursor_type as p
+				then
+					create c
+					c.set_info (p.create_info)
+					c.set_type (p)
+					if attached multi_constraint_static as t then
+						c.set_multi_constraint_static (t)
+					end
+					c.analyze
+					instance_free_creation := c
+				end
+			end
+		end
+
+feature {NONE} -- Code generation
+
+	generate_nested_flag (has_target: BOOLEAN)
+			-- Setup a flag that indicates whether a subsequent call is nested,
+			-- so that class invariant should be checked on the target that is present if `has_target` is set.
+			-- Update `is_right_parenthesis_needed` if the flag is generated and has to be closed after the call.
+		require
+			is_final_mode: context.final_mode
+			is_right_parenthesis_unneeded: not is_right_parenthesis_needed.item
+		local
+			buf: like buffer
+		do
+			if system.keep_assertions then
+				is_right_parenthesis_needed.put (True)
+				buf := buffer
+				buf.put_string ("(nstcall = ")
+				buf.put_integer (if not is_first and has_target or else call_kind = call_kind_creation then call_kind else 0 end)
+				buf.put_two_character (',', ' ')
+			end
+		end
+
+	generate_no_call
+			-- Generate code for the case when there is no suitable routine to call.
+			-- This may happen for calls on void target.
+		require
+			is_final_mode: context.final_mode
+			is_effective: not is_deferred.item
+		local
+			buf: like buffer
+			l_type_c: TYPE_C
+		do
+			buf := buffer
+			buf.put_string ({C_CONST}.open_rtna_open)
+			buf.put_string ("NULL))")
+			l_type_c := real_type (type).c_type
+			if not l_type_c.is_void then
+				buf.put_two_character (',', ' ')
+				l_type_c.generate_default_value (buf)
+			end
+			buf.put_character (')')
+			is_deferred.put (True)
+		ensure
+			is_deferred: is_deferred.item
+		end
+
 feature -- Optimization
 
 	is_polymorphic: BOOLEAN
-			-- Is access polymorphic ?
+			-- Is access polymorphic?
 		local
 			type_i: TYPE_A
 		do
 			type_i := context_type
-			if not type_i.is_basic and then precursor_type = Void then
-				Result := Eiffel_table.is_polymorphic (routine_id, type_i, context.context_class_type, True) >= 0
+			if
+				not type_i.is_basic and then
+				not attached precursor_type
+			then
+				Result := Eiffel_table.is_polymorphic_for_body (routine_id, type_i, context.original_class_type) >= 0
 			end
 		end
 
@@ -136,10 +225,30 @@ feature -- Optimization
 			Result := Eiffel_table.poly_table (routine_id).has_one_signature
 		end
 
+feature {NONE} -- Access
+
+	is_deferred: CELL [BOOLEAN]
+			-- Is current feature call a deferred feature without implementation?
+			-- This may happen even when there is an implementation, but no suitable object is ever created.
+		once
+			create Result.put (False)
+		ensure
+			is_deferred_not_void: Result /= Void
+		end
+
+	is_right_parenthesis_needed: CELL [BOOLEAN]
+			-- Does current call require to close a parenthesis?
+			-- Case when one use `nstcall' or `eif_optimize_return'.
+		once
+			create Result.put (False)
+		ensure
+			is_right_parenthesis_needed_attached: attached Result
+		end
+
 note
 	date: "$Date$"
 	revision: "$Revision$"
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

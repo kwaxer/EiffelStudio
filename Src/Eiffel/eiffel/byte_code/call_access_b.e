@@ -16,7 +16,8 @@ inherit
 			generate_parameters,
 			generate_finalized_separate_call_args,
 			generate_workbench_separate_call_args,
-			generate_workbench_separate_call_get_result
+			generate_workbench_separate_call_get_result,
+			pre_inlined_code
 		end
 
 	SHARED_NAMES_HEAP
@@ -68,6 +69,12 @@ feature -- Access
 		end
 
 feature -- Status report
+
+	is_instance_free: BOOLEAN
+			-- Is the call instance-free, i.e. does not need a target object?
+		do
+				-- False by default.
+		end
 
 	is_target_type_fixed: BOOLEAN
 			-- Is target type known at compile time?
@@ -171,55 +178,6 @@ feature -- Byte code generation
 		do
 		end
 
-	generate_workbench_access_on_type (reg: REGISTRABLE; typ: CL_TYPE_A; result_register: REGISTER)
-			-- Generate feature call in a `typ' context
-			-- in workbench mode.
-		require
-			result_register_attached: c_type.is_reference implies result_register /= Void
-		local
-			buf: GENERATION_BUFFER
-			return_type: TYPE_C
-		do
-			buf := buffer
-			return_type := c_type
-			if not return_type.is_void then
-				buf.put_two_character ('(', '(')
-				if return_type.is_reference then
-					context.print_argument_register (result_register, buf)
-					buf.put_string (" = ")
-				end
-			end
-			buf.put_character ('(')
-			return_type.generate_function_cast (buf, argument_types, True)
-			generate_workbench_address (reg, typ)
-			buf.put_character (')')
-		end
-
-	generate_workbench_address (reg: REGISTRABLE; typ: CL_TYPE_A)
-			-- Generate workbench address of a routine that is called on `reg' of type `typ'.
-		require
-			reg_attached: attached reg
-			typ_attached: attached typ
-		do
-			generate_call_macro (routine_macro, reg, typ)
-		end
-
-	generate_workbench_end (result_register: REGISTER)
-			-- Generate final portion of C code in workbench mode.
-		require
-			result_register_attached: c_type.is_reference implies result_register /= Void
-		local
-			buf: GENERATION_BUFFER
-		do
-			if not c_type.is_void then
-					-- This is a query. The result value may need conversion.
-				buf := buffer
-				buf.put_character (')')
-				generate_return_value_conversion (result_register)
-				buf.put_character (')')
-			end
-		end
-
 	special_routines: SPECIAL_FEATURES
 			-- Array containing special routines.
 		once
@@ -254,7 +212,7 @@ feature -- Byte code generation
 			type_i := context_type
 				-- Special provision is made for calls on basic types
 				-- (they have to be themselves known by the compiler).
-				-- Note: Manu 08/08/2002: if `precursor_type' is not Void, it can only means
+				-- Note: Manu 08/08/2002: if `precursor_type' is not Void, it can only mean
 				-- that we are currently performing a static access call on a feature
 				-- from a basic class. Assuming otherwise is not correct as you
 				-- cannot seriously inherit from a basic class.
@@ -344,6 +302,31 @@ feature -- Byte code generation
 			generate_end (gen_reg, class_type)
 		end
 
+feature {NONE} -- Finalized C code generation: inlining
+
+	pre_inlined_code: CALL_B
+			-- <Precursor>
+		local
+			inlined_current_b: INLINED_CURRENT_B
+		do
+			if attached parent then
+					-- Inlining is done by updating the parent.
+				Result := Current
+			else
+					-- Use an inline current instead of the regular one.
+				create parent
+				create inlined_current_b
+				parent.set_target (inlined_current_b)
+				inlined_current_b.set_parent (parent)
+				parent.set_message (Current)
+				Result := parent
+			end
+			if attached parameters as p then
+					-- Update paramaters.
+				set_parameters (p.pre_inlined_code)
+			end
+		end
+
 feature {NONE} -- C code generation
 
 	generate_return_value_conversion (result_register: REGISTER)
@@ -388,83 +371,6 @@ feature {NONE} -- C code generation
 			end
 		end
 
-	generate_call_macro (m: like routine_macro; t: REGISTRABLE; c: CL_TYPE_A)
-			-- Generate a call macro identified by `m' to a feature
-			-- assuming that `t' contains a target of a call of type `c'.
-		require
-			m_attached: attached m
-			t_attached: attached t
-			c_attached: attached c
-		local
-			is_nested: BOOLEAN
-			buf: GENERATION_BUFFER
-			cl_type_i: CL_TYPE_A
-			l_type: TYPE_A
-			macro: STRING
-		do
-			is_nested := not is_first
-			buf := buffer
-			if
-				attached precursor_type as p and then
-				is_target_type_fixed
-			then
-				l_type := context.real_type (p)
-				if l_type.is_multi_constrained then
-					check
-						has_multi_constraint_static: has_multi_constraint_static
-					end
-					l_type := context.real_type (multi_constraint_static)
-				end
-				check attached {CL_TYPE_A} l_type as ct then
-					cl_type_i := ct
-				end
-			else
-				cl_type_i := c
-			end
-			if is_nested then
-				inspect call_kind
-				when call_kind_creation then
-					macro := m.creation_call
-				when call_kind_qualified then
-					macro := m.qualified_call
-				else
-					macro := m.unqualified_call
-				end
-			else
-				macro := m.unqualified_call
-			end
-			buf.put_string (macro)
-			buf.put_character ('(')
-			buf.put_integer (routine_id)
-			buf.put_two_character (',', ' ')
-			if not is_nested then
-				if not attached precursor_type then
-					context.generate_current_dtype
-				elseif is_target_type_fixed then
-						-- Use dynamic type of parent instead
-						-- of dynamic type of Current.
-					buf.put_static_type_id (cl_type_i.static_type_id (context.context_class_type.type))
-				else
-					buf.put_string ({C_CONST}.dtype)
-					buf.put_character ('(')
-					t.print_register
-					buf.put_character (')')
-				end
-			elseif call_kind = call_kind_qualified then
-					-- Feature name is used to report a call on a void target.
-					-- This cannot happen with unqualified call or a creation procedure call.
-				buf.put_string_literal (feature_name)
-				buf.put_two_character (',', ' ')
-				t.print_register
-			else
-				buf.put_string ({C_CONST}.dtype)
-				buf.put_character ('(')
-				t.print_register
-				buf.put_character (')')
-			end
-			buf.put_character (')')
-		end
-
 	routine_macro: TUPLE [unqualified_call, qualified_call, creation_call: STRING]
 			-- Macros that compute address of a routine to be called.
 			-- `Result.unqualified_call' denotes an unqualified call.
@@ -494,7 +400,7 @@ feature {NONE} -- Separate call
 				-- Generate the feature name.
 			buf := buffer
 			target_type := context_type
-			array_index := Eiffel_table.is_polymorphic (routine_id, target_type, Context.context_class_type, True)
+			array_index := Eiffel_table.is_polymorphic_for_body (routine_id, target_type, Context.context_class_type)
 			if array_index = -2 then
 					-- Call to a deferred feature without implementation
 				buf.put_string ("NULL")
@@ -594,15 +500,18 @@ feature {NONE} -- Debug
 
 feature {NONE} -- Implementation
 
-	byte_node (f: FEATURE_I; a_context_type: TYPE_A): ACCESS_B
-			-- Byte node for the context feature `f' called on type `a_context_type'
+	byte_node (f: FEATURE_I; is_separate: BOOLEAN): ACCESS_B
+			-- Byte node for the context feature `f` called on a type
+			-- that is separate or not depending on `is_separate`.
 		require
 			f_not_void: f /= Void
 		local
 			p: like parent
 		do
-			Result := f.access (type, p /= Void, a_context_type.is_separate)
 			p := parent
+			Result := f.access_for_feature (type, precursor_type, p /= Void, is_separate, is_instance_free)
+			Result.set_parameters (parameters)
+			Result.set_multi_constraint_static (multi_constraint_static)
 			if p /= Void then
 				Result.set_parent (p)
 				if p.message = Current then
@@ -612,13 +521,66 @@ feature {NONE} -- Implementation
 					p.set_target (Result)
 				end
 			end
-			Result.set_parameters (parameters)
 		ensure
 			result_not_void: Result /= Void
 		end
 
+	direct_byte_node (f: FEATURE_I; is_separate: BOOLEAN): ACCESS_B
+			-- Byte node for the context feature `f` called on a type
+			-- that is separate or not depending on `is_separate`.
+			-- The byte node is not supposed to be a wrapper
+			-- (i.e. it should not produce feature byte node when `f` describes an attribute).
+		require
+			f_not_void: f /= Void
+			not_is_once: not f.is_once
+		local
+			p: like parent
+		do
+			p := parent
+			Result := f.direct_access_for_feature (type, precursor_type, p /= Void, is_separate, is_instance_free)
+			Result.set_parameters (parameters)
+			Result.set_multi_constraint_static (multi_constraint_static)
+			if p /= Void then
+				Result.set_parent (p)
+				if p.message = Current then
+					p.set_message (Result)
+				else
+					check p.target = Current end
+					p.set_target (Result)
+				end
+			end
+		ensure
+			result_not_void: Result /= Void
+		end
+
+feature {NONE} -- Access
+
+	effective_entry (target_type: TYPE_A; target_type_id: INTEGER; routine_table: ROUT_TABLE): detachable ROUT_ENTRY
+			-- An entry to call (if any) when there is only one reachable version of the feature
+			-- for the type `target_type` of ID `target_type_id` in the table `routine_table`.
+		require
+			target_type_id = target_type.type_id (context.context_cl_type)
+		do
+			if
+				attached precursor_type as p and then
+				(is_instance_free implies not p.is_formal and then (p.is_like implies p.is_expanded))
+			then
+					-- The feature to call is fixed.
+					-- This is true even for calls on generic types with formal generics because the code is generated for a particular class type.
+				routine_table.goto (target_type_id)
+			else
+					-- The feature to call corresponds to the target type or a conforming descendant.
+				routine_table.goto_implemented (target_type, context.original_class_type)
+			end
+			if routine_table.is_implemented then
+				Result := routine_table.item
+			end
+		ensure
+			attached Result implies attached routine_table.context_item
+		end
+
 note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

@@ -5,7 +5,6 @@ note
 			]"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
-	author: ""
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -20,8 +19,7 @@ inherit
 		redefine
 			reset,
 			text_field,
-			prepare_completion,
-			cursor_token_provider
+			prepare_completion
 		end
 
 	EB_COMPLETE_INFO_ANALYZER
@@ -83,8 +81,7 @@ feature -- Change
 			else
 				current_feature_as := Void
 			end
-			reset_completion_list
-			class_completion_possibilities := Void
+			reset_completion_lists
 		end
 
 feature -- Basic operation
@@ -117,7 +114,7 @@ feature -- Basic operation
 				if provide_features then
 					current_token := text_field.current_token_in_line (watching_line)
 					current_line := watching_line
-					build_completion_list (current_token, current_pos_in_token)
+					build_feature_completion_list (current_token, current_pos_in_token)
 				end
 			end
 			if provide_classes then
@@ -130,6 +127,11 @@ feature -- Basic operation
 					build_class_completion_list (current_token)
 				end
 			end
+			if provide_alias_name then
+				current_token := text_field.current_token_in_line (watching_line)
+				current_line := watching_line
+				build_alias_name_completion_list (current_token)
+			end
 		end
 
 	reset
@@ -137,10 +139,10 @@ feature -- Basic operation
 			Precursor {EB_COMPLETE_INFO_ANALYZER}
 			Precursor {EB_COMPLETION_POSSIBILITIES_PROVIDER}
 			watching_line := Void
-			reset_completion_list
-			class_completion_possibilities := Void
+			reset_completion_lists
 			provide_features := False
 			provide_classes := False
+			provide_alias_name := False
 		end
 
 feature -- Element change
@@ -388,7 +390,7 @@ feature {NONE} -- Build completion possibilities
 			-- Function to retrieve group
 
 ;note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

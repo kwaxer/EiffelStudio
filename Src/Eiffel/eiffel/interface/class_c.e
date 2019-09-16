@@ -386,6 +386,14 @@ feature -- Status report
 			Result := lace_class.options.is_warning_enabled (a_warning)
 		end
 
+	is_warning_reported_as_error (w: STRING): BOOLEAN
+			-- Should warning `w` be reported as an error?
+		require
+			is_warning_enabled (w)
+		do
+			Result := lace_class.options.is_warning_as_error
+		end
+
 	apply_msil_application_optimizations: BOOLEAN
 			-- Should MSIL application optimizations be applied?
 		do
@@ -1047,7 +1055,7 @@ feature {NONE} -- Private access
 	any_parent: PARENT_C
 			-- Default compiled parent.
 		once
-			create Result
+			create Result.make (create {ID_AS}.initialize_from_id (names_heap.any_name_id))
 			Result.set_parent_type (Any_type)
 		ensure
 			any_parent_not_void: Result /= Void
@@ -2271,8 +2279,7 @@ feature {TYPE_AS, AST_TYPE_A_GENERATOR, AST_FEATURE_CHECKER_GENERATOR} -- Actual
 							new_actuals.forth
 						end
 							-- Avoid changing original list of arguments.
-						new_actuals.start
-						new_actuals := new_actuals.duplicate (actual_count)
+						create new_actuals.make_from_iterable (new_actuals)
 							-- Replace extra arguments with a tuple.
 						create tuple_actual.make (system.tuple_id, wrapped_actuals)
 						if not lace_class.is_void_unsafe then
@@ -2833,7 +2840,14 @@ feature {CLASS_C} -- Incrementality
 		local
 			class_filters: like filters
 			class_filters_cursor: INTEGER
+			base_type: CL_TYPE_A
 		do
+				-- Use the basic type of the supplied class type for instantiation if available.
+			base_type := new_class_type.basic_type
+			if not attached base_type then
+					-- Otherwise, use the regular type of the supplied class type.
+				base_type := new_class_type.type
+			end
 			class_filters := filters
 			from
 				class_filters.start
@@ -2846,7 +2860,10 @@ feature {CLASS_C} -- Incrementality
 					-- we are going to traverse recursively the `filters' list.
 				class_filters_cursor := class_filters.cursor
 					-- Instantiation of the filter with `new_class_type'.
-				if attached {CL_TYPE_A} class_filters.item_for_iteration.instantiation_in (new_class_type.type, class_id) as filter and then not filter.has_formal_generic then
+				if
+					attached {CL_TYPE_A} class_filters.item_for_iteration.instantiation_in (base_type, class_id) as filter and then
+					not filter.has_formal_generic
+				then
 					check
 						has_associated_class: filter.has_associated_class
 					end
@@ -2915,7 +2932,8 @@ feature -- Validity class
 					not l_feature.is_routine or l_feature.argument_count > 0
 				then
 					error_handler.insert_warning (
-						create {SPECIAL_ERROR}.make ("Class ANY must have a procedure `internal_correct_mismatch' with no arguments for recoverable storable to work properly", Current))
+						create {SPECIAL_ERROR}.make ("Class ANY must have a procedure `internal_correct_mismatch' with no arguments for recoverable storable to work properly", Current),
+						original_class.options.is_warning_as_error)
 				end
 				l_feature := feature_table.item_id (names_heap.is_equal_name_id)
 				if
@@ -3051,8 +3069,20 @@ feature -- default_create routine
 
 feature -- Dead code removal
 
-	mark_visible (remover: REMOVER)
-			-- Dead code removal from the visible features.
+	mark_visible_class (remover: REMOVER)
+			-- Mark class as visible for dead code removal.
+		require
+			visible_level.has_visible
+		do
+			if is_deferred then
+				remover.mark_class_reachable (class_id)
+			else
+				remover.mark_class_alive (class_id)
+			end
+		end
+
+	mark_visible_features (remover: REMOVER)
+			-- Mark features as visible for dead code removal.
 		require
 			visible_level.has_visible
 		do
@@ -3454,7 +3484,7 @@ feature -- Properties
 			end
 		end
 
-	constraint_classes (a_formal_dec: FORMAL_DEC_AS) : ARRAY [CLASS_C]
+	constraint_classes (a_formal_dec: FORMAL_DEC_AS) : ARRAY [detachable CLASS_C]
 			-- Computed constraint classes for every formal of the current class.
 			-- Only class types are put into this cache so every item in the cache is error free.
 			-- All other positions are void especially those of formals.
@@ -3481,19 +3511,19 @@ feature -- Properties
 					-- Check if it is Void (case where `constraint_renaming'
 					-- was already called for `a_formal_dec').
 				if Result = Void then
-					create Result.make (1, a_formal_dec.constraints.count)
+					create Result.make_filled (Void, 1, a_formal_dec.constraints.count)
 					l_formal_cache.constraint_classes := Result
 				end
 			else
 					-- Insert `a_formal_dec'.
-				create Result.make (1, a_formal_dec.constraints.count)
+				create Result.make_filled (Void, 1, a_formal_dec.constraints.count)
 				l_cache.put ([Result, l_default_array], l_pos)
 			end
 		ensure
 			constraint_classes_not_void: Result /= Void
 		end
 
-	constraint_renaming (a_formal_dec: FORMAL_DEC_AS): ARRAY [RENAMING_A]
+	constraint_renaming (a_formal_dec: FORMAL_DEC_AS): ARRAY [detachable RENAMING_A]
 			-- Computed renamings for every formal of the current class.
 			-- Only sane renamings are put into this cache so every item in the cache is error free.
 			-- All other positions are void especially those of formal constraints as they are not allowed to have renamings.
@@ -3519,12 +3549,12 @@ feature -- Properties
 					-- Check if it is Void (case where `constraint_classes'
 					-- was already called for `a_formal_dec').
 				if Result = Void then
-					create Result.make (1, a_formal_dec.constraints.count)
+					create Result.make_filled (Void, 1, a_formal_dec.constraints.count)
 					l_formal_cache.constraint_renaming := Result
 				end
 			else
 					-- Insert `a_formal_dec'.
-				create Result.make (1, a_formal_dec.constraints.count)
+				create Result.make_filled (Void, 1, a_formal_dec.constraints.count)
 				l_cache.put ([l_default_array, Result], l_pos)
 			end
 		ensure
@@ -4787,7 +4817,7 @@ feature -- Implementation
 
 feature {INTERNAL_COMPILER_STRING_EXPORTER} -- Querry
 
-	feature_named (n: STRING): FEATURE_I
+	feature_named (n: READABLE_STRING_8): FEATURE_I
 			-- Feature whose internal name is `n'
 		require
 			n_not_void: n /= Void
@@ -5291,7 +5321,7 @@ invariant
 	-- has_ast: has_ast
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

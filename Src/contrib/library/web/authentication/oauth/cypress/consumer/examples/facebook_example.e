@@ -50,7 +50,7 @@ feature {NONE} -- Initialization
 	    	  create request.make ("GET", protected_resource_url)
 	    	  request.add_header ("Authorization", "Bearer " + l_access_token.token)
 	 		  api_service.sign_request (l_access_token, request)
-	    	  if attached {OAUTH_RESPONSE} request.execute as l_response then
+	    	  if attached request.execute as l_response then
 					print ("%NOk, let see what we found...")
 					print ("%NResponse: STATUS" + l_response.status.out)
 					if attached l_response.body as l_body then
@@ -64,13 +64,13 @@ feature {NONE} -- Initialization
 
 feature {NONE} -- Implementation
 
-	api_key : STRING ="api_key"
-	api_secret :STRING ="api_secret"
+	api_key : STRING =""
+	api_secret :STRING =""
 	protected_resource_url : STRING = "https://graph.facebook.com/me";
  	empty_token : detachable  OAUTH_TOKEN
 
 ;note
-	copyright: "2013-2014, Javier Velilla, Jocelyn Fiat, Eiffel Software and others"
+	copyright: "2013-2017, Javier Velilla, Jocelyn Fiat, Eiffel Software and others"
 	license: "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software

@@ -16,9 +16,9 @@ inherit
 			feature_name as attribute_name
 		redefine
 			reverse_code, expanded_assign_code, assign_code,
-			enlarged, is_creatable, is_attribute, read_only,
-			assigns_to, pre_inlined_code, size,
-			need_target, set_is_attachment
+			enlarged, is_assignable, is_attribute, read_only,
+			assigns_to, pre_inlined_code,
+			need_target, set_is_attachment, is_writable
 		end
 
 create
@@ -29,7 +29,11 @@ feature {NONE} -- Initialization
 	make (a: ATTRIBUTE_I)
 			-- Initialization
 		require
-			good_argument: a /= Void
+			attached a
+			system.has_class_of_id (a.access_in)
+			attached system.class_of_id (a.access_in) as c
+			attached c.feature_of_rout_id (a.rout_id_set.first) as f
+			a.rout_id_set.first = f.rout_id_set.first
 		do
 			attribute_name_id := a.feature_name_id
 			routine_id := a.rout_id_set.first
@@ -38,13 +42,20 @@ feature {NONE} -- Initialization
 				written_in := a.origin_class_id
 			else
 				attribute_id := a.feature_id
-				written_in := a.written_in
+				written_in := a.access_in
 			end
 			if attached a.extension as e then
 				need_target := e.need_current (e.type)
 			else
 				need_target := True
 			end
+		ensure
+			attribute_name_id = a.feature_name_id
+			routine_id = a.rout_id_set.first
+			system.has_class_of_id (written_in)
+			attached system.class_of_id (written_in) as c
+			attached c.feature_of_rout_id (routine_id) as f
+			f.is_attribute
 		end
 
 feature -- Visitor
@@ -82,8 +93,11 @@ feature
 	is_attribute: BOOLEAN = True
 			-- Is Current an access to an attribute ?
 
-	is_creatable: BOOLEAN = True
-			-- Can an access to an attribute be a target for a creation ?
+	is_assignable: BOOLEAN = True
+			-- <Precursor>
+
+	is_writable: BOOLEAN = True
+			-- <Precursor>
 
 	same (other: ACCESS_B): BOOLEAN
 			-- Is `other' the same access as Current ?
@@ -93,36 +107,16 @@ feature
 			end
 		end
 
-	wrapper: FEATURE_B
-			-- A wrapper to be called for an attribute that may need to be initialized
-			-- (Void if none)
-		local
-			is_initialization_required: BOOLEAN
-			p: like parent
+	wrapper: detachable FEATURE_B
+			-- A wrapper (if needed) to be called for an attribute that may need to be initialized.
 		do
-			if context.workbench_mode and then context_type.is_separate then
-					-- Wrap a separate call in workbench mode.
-				is_initialization_required := True
-			elseif not is_attachment and then not real_type (type).is_basic then
-					-- No need to wrap a target of an attachment as well as
-					-- access to an attribute of a basic type that is always initialized.
-				if context.workbench_mode then
-						-- Attribute may be redeclared to become of an attached type and to have a body.
-					is_initialization_required := True
-				else
-						-- Check if attribute is of an attached type in some descendant
-						-- that declares an explicit body for it.
-					is_initialization_required := Eiffel_table.poly_table (routine_id).is_initialization_required (context_type, context.context_class_type)
-				end
-			end
 			if is_initialization_required then
 					-- Call a wrapper that performs the required initialization.
 				create {FEATURE_B} Result.make (context_type.base_class.feature_of_rout_id (routine_id), type, Void, False)
 				if has_multi_constraint_static then
 					Result.set_multi_constraint_static (multi_constraint_static)
 				end
-				p := parent
-				if p /= Void then
+				if attached parent as p then
 					Result.set_parent (p)
 					if p.message = Current then
 						p.set_message (Result)
@@ -143,7 +137,7 @@ feature
 			if attached wrapper as f then
 					-- Call a wrapper that performs the required initialization.
 				if context.final_mode then
-					create {FEATURE_BL} Result.fill_from (f)
+					Result := f.enlarged
 				else
 					create {FEATURE_BW} Result.fill_from (f)
 				end
@@ -152,6 +146,28 @@ feature
 					create {ATTRIBUTE_BL} Result.fill_from (Current)
 				else
 					create {ATTRIBUTE_BW} Result.fill_from (Current)
+				end
+			end
+		end
+
+feature {NONE} -- Status report
+
+	is_initialization_required: BOOLEAN
+			-- Is it potentially required to evaluate an associated attribute body before the value can be read?
+		do
+			if context.workbench_mode and then context_type.is_separate then
+					-- Wrap a separate call in workbench mode.
+				Result := True
+			elseif not is_attachment and then not real_type (type).is_basic then
+					-- No need to wrap a target of an attachment as well as
+					-- access to an attribute of a basic type that is always initialized.
+				if context.workbench_mode then
+						-- Attribute may be redeclared to become of an attached type and to have a body.
+					Result := True
+				else
+						-- Check if attribute is of an attached type in some descendant
+						-- that declares an explicit body for it.
+					Result := Eiffel_table.poly_table (routine_id).is_initialization_required (context_type, context.context_class_type)
 				end
 			end
 		end
@@ -185,26 +201,25 @@ feature -- Array optimization
 
 feature -- Inlining
 
-	size: INTEGER
+	pre_inlined_code: CALL_B
 		do
-			if False then
-				(create {REFACTORING_HELPER}).to_implement ("Check if attribute has to be initialized.")
-					-- Inlining will not be done if the attribute has to be initialized
-				Result := 101	-- equal to maximum size of inlining + 1 (Found in FREE_OPTION_SD)
-			end
-		end
-
-	pre_inlined_code: ATTRIBUTE_B
-		do
-			if parent /= Void then
+			if attached parent then
+					-- Inlining is performed by adapting the target of the call.
 				Result := Current
-			else
+			elseif not is_initialization_required then
+					-- No initialization is required, use inlined attribute access.
 				create {INLINED_ATTR_B} Result.fill_from (Current)
+			else
+					-- Adapt access to the attribute using the standard procedure
+					-- that may later wrap the attribute into a function to initialize it accordingly.
+				Result := Precursor
 			end
+		ensure then
+			is_attachment implies attached {like {ASSIGN_B}.target} Result
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

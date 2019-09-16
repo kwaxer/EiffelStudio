@@ -230,19 +230,25 @@ feature -- Status setting
 
 feature {NONE} -- Helpers
 
-	frozen stock_pixmaps: attached ES_PIXMAPS_16X16
-			-- Shared access to stock 16x16 EiffelStudio pixmaps
-		once
-			Result := (create {EB_SHARED_PIXMAPS}).icon_pixmaps
+	frozen stock_pixmaps: ES_ICONS
+			-- Shared access to stock EiffelStudio pixmaps
+		do
+				-- TODO review
+				-- update once feature to load pixmaps based monitor dpi.
+				-- using object-less call
+				-- Date: 05/24/2019
+			Result := {EB_SHARED_PIXMAPS}.icon_pixmaps
 		end
 
-	frozen stock_mini_pixmaps: attached ES_PIXMAPS_10X10
-			-- Shared access to stock 10x10 EiffelStudio pixmaps
-		once
-			Result := (create {EB_SHARED_PIXMAPS}).mini_pixmaps
+	frozen stock_mini_pixmaps: ES_MINI_ICONS
+			-- Shared access to stock EiffelStudio pixmaps
+		do
+				-- TODO review
+				-- update once feature to load pixmaps based monitor dpi.
+			Result := {EB_SHARED_PIXMAPS}.mini_pixmaps
 		end
 
-	frozen stone_director: attached ES_TOOL_STONE_REDIRECT_HELPER
+	frozen stone_director: ES_TOOL_STONE_REDIRECT_HELPER
 			-- Shared access to a stone redirection helper
 		require
 			develop_window_is_interface_usable: internal_stone_director = Void implies develop_window.is_interface_usable
@@ -410,7 +416,7 @@ invariant
 	--tool_descriptor_attached: not is_recycled implies tool_descriptor /= Void
 
 note
-	copyright: "Copyright (c) 1984-2017, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

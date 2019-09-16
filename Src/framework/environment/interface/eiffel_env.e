@@ -1,7 +1,6 @@
 ﻿note
 
-	description:
-		"Environment for bitmaps, help, binaries, scripts...."
+	description: "Environment for bitmaps, help, binaries, scripts...."
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
 	date: "$Date$"
@@ -11,6 +10,8 @@ deferred class EIFFEL_ENV
 
 inherit
 	ANY
+
+	LOCALIZED_PRINTER
 
 	SHARED_COMPILER_PROFILE
 
@@ -92,26 +93,36 @@ feature -- Access
 				Result.append_string_general ("Base Path = ")
 				Result.append (unix_layout_base_path.name)
 			else
-				Result.append_string_general ("$ISE_EIFFEL = ")
+				Result.append_string_general ("$" + {EIFFEL_CONSTANTS}.ise_eiffel_env)
+				Result.append_string_general (" = ")
 				Result.append (install_path.name)
 				Result.append_string_general ("%N")
-				Result.append_string_general ("$ISE_LIBRARY = ")
+				Result.append_string_general ("$" + {EIFFEL_CONSTANTS}.ise_library_env)
+				Result.append_string_general (" = ")
 				Result.append (eiffel_library.name)
 				Result.append_string_general ("%N")
-				Result.append_string_general ("$ISE_PLATFORM = ")
+				Result.append_string_general ("$" + {EIFFEL_CONSTANTS}.ise_platform_env)
+				Result.append_string_general (" = ")
 				Result.append_string_general (eiffel_platform)
 				if {PLATFORM}.is_windows then
 					Result.append_string_general ("%N")
-					Result.append_string_general ("$ISE_C_COMPILER = ")
+					Result.append_string_general ("$" + {EIFFEL_CONSTANTS}.ise_c_compiler_env)
+					Result.append_string_general (" = ")
 					Result.append_string_general (eiffel_c_compiler)
+					if attached eiffel_c_compiler_version as eccv and then not eccv.is_whitespace then
+						Result.append_string_general ("%N")
+						Result.append_string_general ("$" + {EIFFEL_CONSTANTS}.ise_c_compiler_ver_env)
+						Result.append_string_general (" = ")
+						Result.append_string_general (eccv)
+					end
 				end
 			end
 		ensure
 			not_result_is_empty: not Result.is_empty
 		end
 
-	copyright_year: STRING = "2018"
-			-- Copyright year
+	copyright_year: STRING = "2019"
+			-- Copyright year.
 
 feature -- Access
 
@@ -124,6 +135,7 @@ feature -- Access
 				create Result.make_empty
 			end
 		ensure
+			instance_free: class
 			executable_suffix_not_void: Result /= Void
 			not_result_is_empty: {PLATFORM}.is_windows implies not Result.is_empty
 		end
@@ -217,7 +229,7 @@ feature -- Status update
 				elseif l_variable.is_directory and then not u.directory_exists (l_value) then
 					io.error.put_string (l_product_names.workbench_name)
 					io.error.put_string (": the environment variable " + {EIFFEL_CONSTANTS}.ise_eiffel_env + " points to a non-existing directory:%N")
-					io.error.put_string (l_value.as_string_8)
+					localized_print_error (l_value)
 					l_is_valid := False
 				else
 						-- Set the environment variable, as it may have come from the Windows registry.
@@ -249,7 +261,7 @@ feature -- Status update
 
 				if not directory_path_exists (bin_path) then
 					io.error.put_string (l_product_names.workbench_name)
-					io.error.put_string (": the path $" + {EIFFEL_CONSTANTS}.ise_eiffel_env + "/studio/spec/$" + {EIFFEL_CONSTANTS}.ise_platform_env + "/bin points to a non-existing directory:%N")
+					io.error.put_string (": the path $" + {EIFFEL_CONSTANTS}.ise_eiffel_env + "/" + distribution_name + "/spec/$" + {EIFFEL_CONSTANTS}.ise_platform_env + "/bin points to a non-existing directory:%N")
 					io.error.put_string (bin_path.utf_8_name)
 					on_check_environment_failure
 				end
@@ -1932,18 +1944,6 @@ feature -- Environment update
 			value_updated: attached get_environment_32 (a_var) as v implies v.same_string_general (a_value)
 		end
 
-	set_environment_32 (a_value, a_var: READABLE_STRING_GENERAL)
-			-- Update environment variable `a_key' to be `a_value'.
-		obsolete "use set_environment"
-		require
-			a_var_ok: a_var /= Void and then not a_var.is_empty and then not a_var.has ('%U')
-			a_value_ok: a_value /= Void and then not a_value.has ('%U')
-		do
-			set_environment (a_value, a_var)
-		ensure
-			value_updated: attached get_environment_32 (a_var) as v implies v.same_string_general (a_value)
-		end
-
 feature {NONE} -- Basic operations
 
 	create_directories
@@ -2376,7 +2376,7 @@ feature {NONE} -- Helper
 		end
 
 ;note
-	copyright: "Copyright (c) 1984-2017, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

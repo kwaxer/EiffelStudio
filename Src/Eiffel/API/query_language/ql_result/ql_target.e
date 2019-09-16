@@ -2,7 +2,6 @@ note
 	description: "Object that represents a target item used in Eiffel query language"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
-	author: ""
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -13,8 +12,6 @@ inherit
 	QL_ITEM
 		redefine
 			is_valid_domain_item,
-			is_compiled,
-			wrapped_domain,
 			nearest_parent_with_scope
 		end
 
@@ -109,7 +106,9 @@ feature -- Access
 		do
 			create l_group_domain_generator
 			l_group_domain_generator.enable_fill_domain
-			Result ?= wrapped_domain.new_domain (l_group_domain_generator)
+			check is_group_domain: attached {like groups_in_target} wrapped_domain.new_domain (l_group_domain_generator) as d then
+				Result := d
+			end
 		ensure
 			result_attached: Result /= Void
 		end
@@ -181,7 +180,7 @@ invariant
 	target_attached: target /= Void
 
 note
-	copyright: "Copyright (c) 1984-2013, Eiffel Software"
+	copyright: "Copyright (c) 1984-2018, Eiffel Software"
 	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

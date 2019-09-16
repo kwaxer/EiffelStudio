@@ -369,7 +369,7 @@ feature -- Access
 		require
 			object_not_void: object /= Void
 		do
-			Result := object.generating_type.name
+			Result := {UTF_CONVERTER}.utf_32_string_to_utf_8_string_8 (object.generating_type.name_32)
 		end
 
 	type_name_32 (object: ANY): STRING_32
@@ -1798,6 +1798,7 @@ feature {TYPE, REFLECTOR, REFLECTED_OBJECT} -- Implementation
 			create Result.put (internal_chunk_size)
 		ensure
 			array_upper_cell: Result /= Void
+			instance_free: class
 		end
 
 	internal_empty_string: IMMUTABLE_STRING_8
@@ -1845,7 +1846,7 @@ feature {TYPE, REFLECTOR, REFLECTED_OBJECT} -- Implementation
 
 note
 	library:	"EiffelBase: Library of reusable components for Eiffel."
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software and others"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software and others"
 	license:	"Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software

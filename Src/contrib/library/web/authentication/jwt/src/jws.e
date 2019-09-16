@@ -1,7 +1,9 @@
 note
-	description: "Summary description for {JWS}."
+	description: "JSON Web Signature (JWS)"
 	date: "$Date$"
 	revision: "$Revision$"
+	EIS: "name=JSON Web Signature", "src=https://tools.ietf.org/html/rfc7515", "protocol=uri"
+	EIS: "name=JSON Web Token (JWT)", "src=https://tools.ietf.org/html/rfc7519", "protocol=uri"
 
 class
 	JWS
@@ -64,14 +66,16 @@ feature -- Conversion
 
 	encoded_string (a_secret: READABLE_STRING_8): STRING
 		local
-			alg, sign: READABLE_STRING_8
+			sign, alg_name: READABLE_STRING_8
+			alg: JWT_ALG
 			l_enc_payload, l_enc_header: READABLE_STRING_8
 		do
 			reset_error
-			alg := header.algorithm
-			if not is_supporting_signature_algorithm (alg) then
-				report_unsupported_alg_error (alg)
-				alg := alg_hs256 -- Default ...
+			alg_name := header.algorithm
+			alg := algorithms [alg_name]
+			if alg = Void then
+				report_unsupported_alg_error (alg_name)
+				alg := algorithms.hs256 -- Default ...
 			end
 			l_enc_header := base64url_encode (header.string)
 			l_enc_payload := base64url_encode (claimset.string)
@@ -94,12 +98,12 @@ feature -- Element change
 
 	set_algorithm_to_hs256
 		do
-			set_algorithm (alg_hs256)
+			set_algorithm (algorithms.hs256.name)
 		end
 
 	set_algorithm_to_none
 		do
-			set_algorithm (alg_none)
+			set_algorithm (algorithms.none.name)
 		end
 
 end

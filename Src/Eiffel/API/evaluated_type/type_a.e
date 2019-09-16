@@ -97,6 +97,7 @@ feature -- Generic conformance
 			-- Mode dependent type id - just for convenience
 		require
 			context_type_valid: is_valid_context_type (a_context_type)
+			has_associated_class_type: has_associated_class_type (a_context_type)
 		do
 			Result := {SHARED_GEN_CONF_LEVEL}.terminator_type       -- Invalid type id.
 			check
@@ -111,6 +112,7 @@ feature -- Generic conformance
 		require
 			valid_file : buffer /= Void
 			context_type_valid: is_valid_context_type (a_context_type)
+			has_associated_class_type: has_associated_class_type (a_context_type)
 		do
 			generate_cid_prefix (buffer, Void)
 			buffer.put_integer (generated_id (final_mode, a_context_type))
@@ -127,6 +129,7 @@ feature -- Generic conformance
 			valid_file : buffer /= Void
 			valid_counter : idx_cnt /= Void
 			context_type_valid: is_valid_context_type (a_context_type)
+			has_associated_class_type: has_associated_class_type (a_context_type)
 		local
 			dummy : INTEGER
 		do
@@ -175,6 +178,7 @@ feature -- Generic conformance
 		require
 			ba_attached: ba /= Void
 			context_type_valid: is_valid_context_type (a_context_type)
+			has_associated_class_type: has_associated_class_type (a_context_type)
 		do
 			make_type_prefix_byte_code (ba)
 			ba.append_natural_16 (generated_id (False, a_context_type))
@@ -427,9 +431,9 @@ feature -- Properties
 		do
 			if a_type /= Void then
 				Result :=
-						-- First type should be the one from a generic derivation.
+						-- First, type should be the one from a generic derivation.
 					a_type.generic_derivation.same_as (a_type) and then
-						-- Second it should be valid for Current type.
+						-- Second, it should be valid for Current type.
 					(a_type.has_associated_class and then is_valid_for_class (a_type.base_class))
 			else
 				Result := True
@@ -488,6 +492,11 @@ feature -- Properties
 			-- Is the current actual type an expanded one ?
 		do
 			-- Do nothing
+		end
+
+	is_expanded_creation_possible: BOOLEAN
+			-- Can this type become expanded in a descendant or generic derivation?
+		do
 		end
 
 	is_enum: BOOLEAN
@@ -1909,13 +1918,13 @@ feature -- Access
 		   		actual_type.has_associated_class
 		   	then
 				ass_class := actual_type.base_class
-				if ass_class.is_obsolete and then ass_class.lace_class.options.is_warning_enabled (w_obsolete_class) then
+				if ass_class.is_obsolete and then current_class.lace_class.options.is_warning_enabled (w_obsolete_class) then
 					create warn.make_with_class (current_class)
 					if current_feature /= Void then
 						warn.set_feature (current_feature)
 					end
 					warn.set_obsolete_class (ass_class)
-					Error_handler.insert_warning (warn)
+					error_handler.insert_warning (warn, current_class.is_warning_reported_as_error (w_obsolete_class))
 				end
 			end
 		end
@@ -2121,7 +2130,7 @@ invariant
 	separate_mark_consistency: not is_expanded implies (has_separate_mark implies is_separate)
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

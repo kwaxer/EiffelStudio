@@ -340,6 +340,7 @@ feature {NONE} -- Implementation
 			l_type: detachable TYPE_A
 			l_index, l_upper: detachable INTEGER
 			locals_list: like private_locals
+			object_test_locals_list: like private_object_test_locals
 			args_list: like private_arguments
 			arg_types: E_FEATURE_ARGUMENTS
 			arg_names: LIST [STRING]
@@ -492,8 +493,10 @@ feature {NONE} -- Implementation
 
 						if l_index <= l_upper then
 								--| Remaining locals, should be OT locals
+
 							l_ot_locals := object_test_locals_info
 							if l_ot_locals /= Void and then not l_ot_locals.is_empty then
+								create object_test_locals_list.make (l_ot_locals.count)
 								from
 									l_ot_locals.start
 								until
@@ -512,7 +515,7 @@ feature {NONE} -- Implementation
 									if l_stat_class /= Void then
 										value.set_static_class (l_stat_class)
 									end
-									locals_list.extend (value)
+									object_test_locals_list.extend (value)
 									l_ot_locals.forth
 									l_index := l_index + 1
 								end
@@ -520,7 +523,7 @@ feature {NONE} -- Implementation
 						end
 
 						if l_index <= l_upper then
-								--| For some reason, there are remaining values on the stack
+								--| For some reason, there are sometime remaining values on the stack
 								--| let's considers them as locals
 							from
 							until
@@ -544,8 +547,8 @@ feature {NONE} -- Implementation
 						end
 
 						check
-							(rout.is_function implies locals_list.count = l_locals.count - 1 )
-							or else locals_list.count = l_locals.count
+							(rout.is_function implies locals_list.count = l_locals.count - 1 - object_test_locals_list.count)
+							or else locals_list.count = l_locals.count + object_test_locals_list.count
 						end
 						l_locals := Void
 					end
@@ -555,6 +558,9 @@ feature {NONE} -- Implementation
 				end
 				if locals_list /= Void and then not locals_list.is_empty then
 					private_locals := locals_list
+				end
+				if object_test_locals_list /= Void and then not object_test_locals_list.is_empty then
+					private_object_test_locals := object_test_locals_list
 				end
 				initialized := True
 				debug ("DEBUGGER_TRACE_CALLSTACK"); io.put_string ("%TFinished initializating stack: " + routine_name + "%N"); end
@@ -636,12 +642,14 @@ invariant
 				not private_arguments.is_empty
 	non_empty_locs_if_exists: private_locals /= Void implies
 				not private_locals.is_empty
+	non_empty_ot_locs_if_exists: private_object_test_locals /= Void implies
+				not private_object_test_locals.is_empty
 	valid_level: level_in_stack >= 1
 
 note
 	date: "$Date$"
-	revision: "$Revision $"
-	copyright:	"Copyright (c) 1984-2015, Eiffel Software"
+	revision: "$Revision$"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

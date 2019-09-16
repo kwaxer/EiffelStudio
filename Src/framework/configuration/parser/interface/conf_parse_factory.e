@@ -8,6 +8,9 @@ note
 class
 	CONF_PARSE_FACTORY
 
+inherit
+	CONF_FILE_CONSTANTS
+
 feature -- Factory: system and redirection
 
 	new_redirection_with_file_name (a_file_name: READABLE_STRING_GENERAL; a_location: READABLE_STRING_GENERAL; a_uuid: detachable UUID): CONF_REDIRECTION
@@ -19,63 +22,28 @@ feature -- Factory: system and redirection
 			create Result.make (a_file_name, a_location, a_uuid)
 		end
 
-	new_system_generate_uuid_with_file_name (a_file_name: READABLE_STRING_GENERAL; a_name: STRING_32): CONF_SYSTEM
+	new_system_generate_uuid_with_file_name (a_file_name: READABLE_STRING_GENERAL; a_name: STRING_32; a_namespace: READABLE_STRING_32): CONF_SYSTEM
 			-- Create a {CONF_SYSTEM} object with an automatically generated UUID.
 		require
 			a_file_name_valid: a_file_name /= Void and then not a_file_name.is_empty
 			a_name_ok: a_name /= Void and then not a_name.is_empty
+			a_namespace_valid: is_namespace_known (a_namespace)
 		do
-			create Result.make_with_uuid (a_file_name, a_name, uuid_generator.generate_uuid)
+			create Result.make_with_uuid (a_file_name, a_name, uuid_generator.generate_uuid, a_namespace)
 			Result.set_is_generated_uuid (True)
 		ensure
 			Result_not_void: Result /= Void
 		end
 
-	new_system_with_file_name (a_file_name: READABLE_STRING_GENERAL; a_name: STRING_32; an_uuid: UUID): CONF_SYSTEM
+	new_system_with_file_name (a_file_name: READABLE_STRING_GENERAL; a_name: STRING_32; an_uuid: UUID; a_namespace: READABLE_STRING_32): CONF_SYSTEM
 			-- Create a `CONF_SYSTEM' object.
 		require
 			a_file_name_valid: a_file_name /= Void and then not a_file_name.is_empty
 			a_name_ok: a_name /= Void and then not a_name.is_empty
 			an_uuid_not_void: an_uuid /= Void
+			a_namespace_valid: is_namespace_known (a_namespace)
 		do
-			create Result.make_with_uuid (a_file_name, a_name, an_uuid)
-		ensure
-			Result_not_void: Result /= Void
-		end
-
-feature -- Factory: system and redirection OBSOLETE
-
-	new_redirection (a_location: READABLE_STRING_GENERAL; a_uuid: detachable UUID): CONF_REDIRECTION
-			-- Create a {CONF_REDIRECTION} object with `a_location' and optional `a_uuid'.
-		obsolete
-			"Use new_redirection_with_file_name [Jan/2014]"
-		require
-			a_location_ok: a_location /= Void and then not a_location.is_empty
-		do
-			Result := new_redirection_with_file_name ("dummy-redirection-file-name.ecf", a_location, a_uuid)
-		end
-
-	new_system_generate_uuid (a_name: STRING_32): CONF_SYSTEM
-			-- Create a {CONF_SYSTEM} object with an automatically generated UUID.
-		obsolete
-			"Use new_system_generate_uuid_with_file_name [Jan/2014]"
-		require
-			a_name_ok: a_name /= Void and then not a_name.is_empty
-		do
-			Result := new_system_generate_uuid_with_file_name ("dummy-system-file-name.ecf", a_name)
-		ensure
-			Result_not_void: Result /= Void
-		end
-
-	new_system (a_name: STRING_32; an_uuid: UUID): CONF_SYSTEM
-			-- Create a `CONF_SYSTEM' object.
-		obsolete
-			"Use new_system_file_name [Jan/2014]"
-		require
-			a_name_ok: a_name /= Void and then not a_name.is_empty
-			an_uuid_not_void: an_uuid /= Void
-		do
-			Result := new_system_with_file_name ("dummy-system-file-name.ecf", a_name, an_uuid)
+			create Result.make_with_uuid (a_file_name, a_name, an_uuid, a_namespace)
 		ensure
 			Result_not_void: Result /= Void
 		end
@@ -376,7 +344,7 @@ feature -- Factory
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

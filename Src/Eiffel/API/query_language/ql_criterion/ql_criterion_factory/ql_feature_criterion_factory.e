@@ -26,7 +26,7 @@ feature{NONE} -- Initialization
 	make
 			-- Initialize.
 		do
-			create agent_table.make (54)
+			create agent_table.make (55)
 			agent_table.put (agent new_false_criterion, c_false)
 			agent_table.put (agent new_has_arguments_criterion, c_has_argument)
 			agent_table.put (agent new_has_assertion_criterion, c_has_assertion)
@@ -64,6 +64,7 @@ feature{NONE} -- Initialization
 			agent_table.put (agent new_is_command_criterion, c_is_command)
 			agent_table.put (agent new_is_visible_criterion, c_is_visible)
 			agent_table.put (agent new_is_from_any_criterion, c_is_from_any)
+			agent_table.put (agent new_is_ghost_criterion, c_is_ghost)
 
 			agent_table.put (agent new_true_criterion, c_true)
 			agent_table.put (agent new_name_is_criterion, c_name_is)
@@ -82,7 +83,7 @@ feature{NONE} -- Initialization
 			agent_table.put (agent new_value_criterion, c_value_of_metric_is)
 			agent_table.put (agent new_value_criterion, c_is_satisfied_by)
 
-			create name_table.make (54)
+			create name_table.make (55)
 			name_table.put (c_false, query_language_names.ql_cri_false)
 			name_table.put (c_has_argument, query_language_names.ql_cri_has_argument)
 			name_table.put (c_has_assertion, query_language_names.ql_cri_has_assertion)
@@ -111,6 +112,7 @@ feature{NONE} -- Initialization
 			name_table.put (c_is_obsolete, query_language_names.ql_cri_is_obsolete)
 			name_table.put (c_is_once, query_language_names.ql_cri_is_once)
 			name_table.put (c_is_class, query_language_names.ql_cri_is_class)
+			name_table.put (c_is_ghost, query_language_names.ql_cri_is_ghost)
 			name_table.put (c_is_origin, query_language_names.ql_cri_is_origin)
 			name_table.put (c_is_prefix, query_language_names.ql_cri_is_prefix)
 			name_table.put (c_is_procedure, query_language_names.ql_cri_is_procedure)
@@ -384,6 +386,14 @@ feature{NONE} -- New criterion
 			result_attached: Result /= Void
 		end
 
+	new_is_ghost_criterion: QL_SIMPLE_FEATURE_CRITERION
+			-- New criterion to test if a feature is a ghost one.
+		do
+			create Result.make (agent is_ghost_agent, True)
+		ensure
+			result_attached: Result /= Void
+		end
+
 	new_is_origin_criterion: QL_SIMPLE_FEATURE_CRITERION
 			-- New criterion to test if a feature is origin
 		do
@@ -648,10 +658,11 @@ feature -- Criterion index
 	c_value_of_metric_is: INTEGER = 50
 	c_is_effective: INTEGER = 51
 	c_is_satisfied_by: INTEGER = 52
-	c_is_class: INTEGER = 53 -- FIXME jfiat [2017/11/30] : is it safe to change value to insert it upper?
+	c_is_class: INTEGER = 53
 	c_has_class_postcondition: INTEGER = 54
+	c_is_ghost: INTEGER = 55
 
-feature{NONE} -- Implementation
+feature {NONE} -- Implementation: agents
 
 	false_agent (a_item: QL_FEATURE): BOOLEAN
 			-- Agent that always returns False.
@@ -798,14 +809,8 @@ feature{NONE} -- Implementation
 		require
 			a_item_attached: a_item /= Void
 			a_item_valid: a_item.is_valid_domain_item
-		local
-			l_feature: E_FEATURE
 		do
-			Result := a_item.is_real_feature
-			if Result then
-				l_feature := a_item.e_feature
-				Result := l_feature.has_rescue_clause
-			end
+			Result := a_item.is_real_feature and then a_item.e_feature.has_rescue_clause
 		end
 
 	is_attribute_agent (a_item: QL_FEATURE): BOOLEAN
@@ -1013,6 +1018,16 @@ feature{NONE} -- Implementation
 			Result := a_item.is_real_feature and then a_item.e_feature.is_class
 		end
 
+	is_ghost_agent (a_item: QL_FEATURE): BOOLEAN
+			-- Agent to test if `a_item' is a ghost feature.
+			-- Require compiled: True.
+		require
+			a_item_attached: a_item /= Void
+			a_item_valid: a_item.is_valid_domain_item
+		do
+			Result := a_item.is_real_feature and then a_item.e_feature.is_ghost
+		end
+
 	is_origin_agent (a_item: QL_FEATURE): BOOLEAN
 			-- Agent to test if `a_item' is origin
 			-- Require compiled: True
@@ -1113,7 +1128,7 @@ feature{NONE} -- Implementation
 note
 	date: "$Date$"
 	revision: "$Revision$"
-	copyright: "Copyright (c) 1984-2018, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

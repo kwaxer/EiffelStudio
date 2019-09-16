@@ -1,10 +1,10 @@
-note
-	description	: "Main description of a byte code tree node. All the classes which %
+﻿note
+	description: "Main description of a byte code tree node. All the classes which %
 				  %describe the byte code inherit from us."
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
-	date		: "$Date$"
-	revision	: "$Revision$"
+	date: "$Date$"
+	revision: "$Revision$"
 
 deferred class BYTE_NODE
 
@@ -135,8 +135,6 @@ feature -- Eiffel source line information
 					if attached {LOCAL_B} a_target as locb then
 						buf.put_new_line
 						buf.put_string ("RTDBGAL(")
-						context.current_register.print_register
-						buf.put_string ({C_CONST}.comma_space)
 						buf.put_integer (locb.position)
 						buf.put_string ({C_CONST}.comma_space)
 						buf.put_hex_natural_32 (l_sk_type)
@@ -157,8 +155,6 @@ feature -- Eiffel source line information
 					if attached {RESULT_B} a_target as resb then
 						buf.put_new_line
 						buf.put_string ("RTDBGAL(")
-						context.current_register.print_register
-						buf.put_string ({C_CONST}.comma_space)
 						buf.put_integer (0) --| Let's say Result's position = 0
 						buf.put_string ({C_CONST}.comma_space)
 						buf.put_hex_natural_32 (l_sk_type)
@@ -172,11 +168,6 @@ feature -- Eiffel source line information
 						buf.put_two_character (')', ';')
 						buf.put_string (" /* Result */")
 					end
---| Keep comment for later.					
---				elseif a_target.is_current then
---					if {curb: !CURRENT_B} a_target then
---						buf.put_string ("/* RTDBGA CURRENT .. */")
---					end
 				end
 			end
 		end
@@ -369,7 +360,7 @@ feature -- Inlining
 
 	size: INTEGER
 		do
-			Result := 0
+				-- Zero by default.
 		ensure
 			Result_greater_or_equal_to_one: Result >= 0
 		end
@@ -393,7 +384,7 @@ feature -- Inlining
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2015, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

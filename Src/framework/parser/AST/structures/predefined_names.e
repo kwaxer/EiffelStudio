@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "Predefined constants for use in NAMES_HEAP"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
@@ -232,6 +232,15 @@ feature -- Constants
 	is_attached_name_id: INTEGER = 219
 	is_deferred_name_id: INTEGER = 220
 	is_expanded_name_id: INTEGER = 221
+	minus_name_id: INTEGER = 222
+	ieee_is_equal_name_id: INTEGER = 223
+	ieee_is_greater_name_id: INTEGER = 224
+	ieee_is_greater_equal_name_id: INTEGER = 225
+	ieee_is_less_name_id: INTEGER = 226
+	ieee_is_less_equal_name_id: INTEGER = 227
+	ieee_maximum_number_name_id: INTEGER = 228
+	ieee_minimum_number_name_id: INTEGER = 229
+	make_from_c_byte_array_name_id: INTEGER = 230
 
 feature -- Classification
 
@@ -253,7 +262,7 @@ feature -- Classification
 		end
 
 note
-	copyright: "Copyright (c) 1984-2016, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[
@@ -284,4 +293,4 @@ note
 			Customer support http://support.eiffel.com
 		]"
 
-end -- class PREDEFINED_NAMES
+end

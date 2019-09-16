@@ -175,19 +175,22 @@ feature -- Visit nodes
 		local
 			l_version: detachable CONF_VERSION
 			l_settings: like {CONF_TARGET}.settings
-			l_sorted_list: ARRAYED_LIST [READABLE_STRING_GENERAL]
+			l_sorted_list: ARRAYED_LIST [attached like known_settings.item]
+			setting_value: like {CONF_TARGET}.settings.item
 		do
 			current_target := a_target
 			append_tag_open ({STRING_32} "target")
 			append_text_attribute (ta_name, a_target.name)
-			if attached a_target.remote_parent as l_remote_parent and then includes_this_or_after (namespace_1_18_0) then
-				if attached l_remote_parent.name as l_remote_parent_name then
-					append_text_attribute (ta_extends, l_remote_parent_name)
+			if attached {CONF_REMOTE_TARGET_REFERENCE} a_target.parent_reference as l_remote and then includes_this_or_after (namespace_1_18_0) then
+				if attached l_remote.name as l_parent_ref_name then
+					append_text_attribute (ta_extends, l_parent_ref_name)
 				end
-				append_text_attribute (ta_extends_location, l_remote_parent.location)
+				append_text_attribute (ta_extends_location, l_remote.location)
 			elseif attached a_target.extends as l_extends then
 					-- Ignore the target if it is a library one (i.e. not explicitly specified in the configuration).
 				append_text_attribute (ta_extends, l_extends.name)
+			elseif attached {CONF_LOCAL_TARGET_REFERENCE} a_target.parent_reference as l_local then
+				append_text_attribute (ta_extends, l_local.name)
 			end
 			if a_target.is_abstract then
 				append_text_attribute (ta_abstract, configuration_value_true)
@@ -223,20 +226,46 @@ feature -- Visit nodes
 			append_target_options (a_target.internal_options)
 
 			l_settings := a_target.internal_settings
-			create l_sorted_list.make_from_array (l_settings.current_keys)
-			;(create {QUICK_SORTER [READABLE_STRING_GENERAL]}.make (create {COMPARABLE_COMPARATOR [READABLE_STRING_GENERAL]})).sort (l_sorted_list)
+			create l_sorted_list.make_from_iterable (known_settings)
+			;(create {QUICK_SORTER [like known_settings.item]}.make (create {COMPARABLE_COMPARATOR [attached like known_settings.item]})).sort (l_sorted_list)
 			across
 				l_sorted_list as s
 			loop
-				if
-					valid_setting (s.item, namespace) and then
-					attached l_settings.item (s.item) as l_setting_item
-				then
-					append_tag_open ({STRING_32} "setting")
-					append_text_attribute ("name", s.item)
-					append_text_attribute ("value", l_setting_item)
-					append_tag_close_empty
+				if valid_setting (s.item, namespace) then
+					setting_value := l_settings.item (s.item)
+					if
+						not attached setting_value and then
+						boolean_settings.has (s.item) and then
+						is_boolean_setting_true (s.item, if attached namespace as n then n else latest_namespace end) /= is_boolean_setting_true (s.item, a_target.system.namespace)
+					then
+							-- The setting has a different default value in the current namespace.
+						setting_value := configuration_boolean_value (is_boolean_setting_true (s.item, a_target.system.namespace))
+					end
+					if attached setting_value then
+						append_tag_open ({STRING_32} "setting")
+						append_text_attribute ("name", s.item)
+						append_text_attribute ("value", setting_value)
+						append_tag_close_empty
+					end
 				end
+			end
+				-- Add a dead code removal setting.
+			if
+				attached a_target.internal_options as o and then
+				attached o.dead_code as dead_code and then
+				dead_code.is_set
+			then
+				append_tag_open ({STRING_32} "setting")
+				append_text_attribute ("name", s_dead_code_removal)
+				append_text_attribute ("value",
+					if includes_this_or_after (namespace_1_20_0) then
+							-- Enumeration in 19.05 and later.
+						dead_code.item
+					else
+							-- Boolean in 18.11 and earlier.
+						configuration_boolean_value (dead_code.index /= {CONF_TARGET_OPTION}.dead_code_index_none)
+					end)
+				append_tag_close_empty
 			end
 				-- Add a manifest array type setting.
 			if
@@ -727,7 +756,13 @@ feature {NONE} -- Implementation
 					-- assembly and only the default rule? => don't print it
 				if is_assembly and then a_conditions.count = 1 then
 					l_condition := a_conditions.first
-					l_done := l_condition.build = Void and l_condition.platform = Void and l_condition.concurrency = Void and l_condition.version.is_empty and l_condition.custom.is_empty
+					l_done :=
+						l_condition.build = Void and
+						l_condition.platform = Void and
+						l_condition.concurrency = Void and
+						l_condition.void_safety = Void and
+						l_condition.version.is_empty and
+						l_condition.custom.is_empty
 				end
 				if not l_done then
 					from
@@ -756,17 +791,21 @@ feature {NONE} -- Implementation
 								append_tag_close_empty
 							end
 						end
+						if attached l_condition.void_safety as c and then includes_this_or_after (namespace_1_19_0) then
+								-- Add "void_safety" condition.
+							append_condition_list (c, agent get_void_safety_name, {STRING_32} "void_safety")
+						end
+
+							-- Don't print dotnet for assemblies.
+						if not is_assembly and then attached l_condition.dotnet as l_dotnet then
+							append_tag_open ({STRING_32} "dotnet")
+							append_boolean_attribute ("value", l_dotnet.item)
+							append_tag_close_empty
+						end
 
 						if attached l_condition.dynamic_runtime as l_dyn_runtime then
 							append_tag_open ({STRING_32} "dynamic_runtime")
 							append_boolean_attribute ("value", l_dyn_runtime.item)
-							append_tag_close_empty
-						end
-
-							-- don't print dotnet for assemblies
-						if not is_assembly and then attached l_condition.dotnet as l_dotnet then
-							append_tag_open ({STRING_32} "dotnet")
-							append_boolean_attribute ("value", l_dotnet.item)
 							append_tag_close_empty
 						end
 
@@ -977,8 +1016,14 @@ feature {NONE} -- Implementation
 			if an_options.is_debug_configured then
 				append_boolean_attribute (o_is_debug, an_options.is_debug)
 			end
-			if an_options.is_warning_configured then
-				append_boolean_attribute (o_is_warning, an_options.is_warning)
+			if an_options.warning.is_set then
+				if is_after_or_equal (namespace, namespace_1_21_0) then
+						-- The option is an enumeration starting from `namespace_1_21_0`.
+					append_text_attribute (o_warning, an_options.warning.item)
+				else
+						-- The option is a boolean value before `namespace_1_21_0`.
+					append_boolean_attribute (o_warning, an_options.warning.index /= {CONF_OPTION}.warning_index_none)
+				end
 			end
 			if an_options.is_msil_application_optimize_configured then
 				append_boolean_attribute (o_is_msil_application_optimize, an_options.is_msil_application_optimize)
@@ -1405,7 +1450,7 @@ feature {NONE} -- Match attribute
 
 note
 	ca_ignore: "CA033", "CA033 — very long class"
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

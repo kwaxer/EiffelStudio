@@ -1,7 +1,7 @@
-note
+﻿note
 	description: "[
-		Table of inherited features indexed by name ID: feature `pass2' is
-		second pass of compiler.
+			Table of inherited features indexed by name ID.
+			Feature `pass2' is second pass of compiler.
 		]"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
@@ -424,10 +424,10 @@ debug ("ACTIVITY")
 	end;
 end;
 					if a_class.is_used_as_expanded then
-						create depend_unit.make_expanded_unit (a_class.class_id);
+						create depend_unit.make_expanded_unit (class_id);
 						pass2_control.propagators.extend (depend_unit)
 					end;
-					create depend_unit.make_creation_unit (a_class.class_id);
+					create depend_unit.make_creation_unit (class_id);
 					pass2_control.propagators.extend (depend_unit)
 				end;
 			else
@@ -454,7 +454,7 @@ debug ("ACTIVITY")
 	io.error.put_string (creation_name);
 	io.error.put_string (" inserted in pass2_control.propagators%N");
 end;
-							create depend_unit.make (a_class.class_id, resulting_table.found_item);
+							create depend_unit.make (class_id, resulting_table.found_item);
 							pass2_control.propagators.extend (depend_unit);
 						end;
 					end;
@@ -463,7 +463,7 @@ end;
 				if a_class.is_used_as_expanded and then
 					(new_creators  = Void or else new_creators.count > 1)
 				then
-					create depend_unit.make_expanded_unit (a_class.class_id);
+					create depend_unit.make_expanded_unit (class_id);
 					pass2_control.propagators.extend (depend_unit)
 				end;
 				old_creators := Void
@@ -815,11 +815,9 @@ end;
 								end
 									-- Remove the inherit info from its old location
 								if l_from_features_list then
-									found_item.features.go_i_th (i)
-									found_item.features.remove
+									found_item.features.remove_i_th (i)
 								else
-									found_item.deferred_features.go_i_th (i)
-									found_item.deferred_features.remove
+									found_item.deferred_features.remove_i_th (i)
 								end
 									-- If old feature has no remaining features then remove from `Current'.
 								if found_item.is_empty then
@@ -1053,33 +1051,32 @@ end;
 								-- `written_in' are ok now. If it is an old
 								-- instance of FEATURE_I from a previous
 								-- compilation, we know if it was an origin.
-							analyze_local_feature_declaration (feature_i, feature_i.feature_name_id)
-								-- Set the export status
-							feature_i.set_export_status (l_export_status);
-							if property_names /= Void then
+							analyze_local_feature_declaration (feature_i, feature_i.feature_name_id, l_export_status)
+							if
+								attached property_names and then
 									-- Check that there are no property name clashes
-								if feature_i.has_property then
-									property_name := single_feature.property_name
-									if property_name = Void or else property_name.is_empty then
-											-- Use implicit property name.
-										property_name := il_casing.pascal_casing
-											(system.dotnet_naming_convention, feature_i.feature_name, {IL_CASING_CONVERSION}.lower_case)
-									end
-									if property_names.has (property_name) then
-										error_handler.insert_error (create {VIPM}.make
-											(a_class, feature_i, property_names.item (property_name), property_name))
-									else
-										property_names.put (feature_i, property_name)
-									end
-										-- Check that there are no property setters with
-										-- several arguments as order of the arguments is
-										-- different in Eiffel and IL.
-									if feature_i.has_property_setter and then
-										(feature_i.type.is_void and then feature_i.argument_count /= 1 or else
-										not feature_i.type.is_void and then feature_i.argument_count > 0)
-									then
-										error_handler.insert_error (create {VIPS}.make (a_class, feature_i))
-									end
+								feature_i.has_property
+							then
+								property_name := single_feature.property_name
+								if property_name = Void or else property_name.is_empty then
+										-- Use implicit property name.
+									property_name := il_casing.pascal_casing
+										(system.dotnet_naming_convention, feature_i.feature_name, {IL_CASING_CONVERSION}.lower_case)
+								end
+								if property_names.has (property_name) then
+									error_handler.insert_error (create {VIPM}.make
+										(a_class, feature_i, property_names.item (property_name), property_name))
+								else
+									property_names.put (feature_i, property_name)
+								end
+									-- Check that there are no property setters with
+									-- several arguments as order of the arguments is
+									-- different in Eiffel and IL.
+								if feature_i.has_property_setter and then
+									(feature_i.type.is_void and then feature_i.argument_count /= 1 or else
+									not feature_i.type.is_void and then feature_i.argument_count > 0)
+								then
+									error_handler.insert_error (create {VIPS}.make (a_class, feature_i))
 								end
 							end
 							name_list.forth;
@@ -1096,49 +1093,51 @@ end;
 			-- Recompute local declarations for a non-syntactically changed
 			-- class.
 		require
-			good_class: a_class /= Void;
-			non_syntactically_changed: a_class.changed2;
+			good_class: a_class /= Void
+			non_syntactically_changed: a_class.changed2
 		local
-			feature_i: FEATURE_I;
-			feature_name_id: INTEGER;
-			id: INTEGER;
+			feature_i: FEATURE_I
+			feature_name_id: INTEGER
+			id: INTEGER
 		do
 			from
-				id := a_class.class_id;
-				feature_table.start;
+				id := a_class.class_id
+				feature_table.start
 			until
 				feature_table.after
 			loop
-				feature_i := feature_table.item_for_iteration;
+				feature_i := feature_table.item_for_iteration
 				if feature_i.written_in = id then
 					feature_name_id := feature_i.feature_name_id
-						-- recompute a former local declaration
-					analyze_local_feature_declaration (feature_i.duplicate, feature_name_id);
-				end;
-				feature_table.forth;
-			end;
-		end;
+						-- Recompute a former local declaration.
+					analyze_local_feature_declaration (feature_i.duplicate, feature_name_id, feature_i.immediate_export_status)
+				end
+				feature_table.forth
+			end
+		end
 
-	analyze_local_feature_declaration (feature_i: FEATURE_I; feature_name_id: INTEGER)
+	analyze_local_feature_declaration (feature_i: FEATURE_I; feature_name_id: INTEGER; immediate_export_status: EXPORT_I)
 			-- Analyze local declaration of class `a_class' named
 			-- `feat_name' which abstract representation is `yacc_feature'.
 		require
 			good_feature: feature_i /= Void;
 			good_feature_name_id: feature_name_id > 0
 		local
-			inherit_feat: INHERIT_FEAT;
+			inherit_feat: INHERIT_FEAT
 				-- Possible inherited features
-			old_feature: FEATURE_I;
-			new_rout_id: INTEGER;
-			new_rout_id_set: ROUT_ID_SET;
-			redef: REDEFINITION;
-			info, inherited_info: INHERIT_INFO;
-			vmfn: VMFN;
-			vmfn1: VMFN1;
-			compute_new_rout_id: BOOLEAN;
+			old_feature: FEATURE_I
+			new_rout_id: INTEGER
+			new_rout_id_set: ROUT_ID_SET
+			redef: REDEFINITION
+			info, inherited_info: INHERIT_INFO
+			vmfn: VMFN
+			vmfn1: VMFN1
+			compute_new_rout_id: BOOLEAN
+			export_status: EXPORT_I
 		do
+			export_status := immediate_export_status
 				-- Now, compute the routine id set of the feature.	
-			inherit_feat := item (feature_name_id);
+			inherit_feat := item (feature_name_id)
 				-- Check if it is not by any chance the case where `feature_i' is an infix/prefix
 				-- routine and the inherited member is using the new `alias' form. Note that we only
 				-- look for deferred routines, since if we had a concrete inherited routine, we would
@@ -1168,7 +1167,7 @@ end;
 
 				-- Find out if there previously was a feature with name
 				-- `feature_name'
-			old_feature := feature_table.item_id (feature_name_id);
+			old_feature := feature_table.item_id (feature_name_id)
 
 			if inherit_feat = Void then
 					-- No feature inherited under name `feature_name'. This
@@ -1176,17 +1175,14 @@ end;
 				if feature_i.is_origin then
 						-- An old feature from a previous compilation was
 						-- an origin. Keep the current routine id.
-					new_rout_id_set := feature_i.rout_id_set;
+					new_rout_id_set := feature_i.rout_id_set
 					check
-						rout_id_set_exists: new_rout_id_set /= Void;
-						has_only_one: new_rout_id_set.count = 1;
-					end;
-					new_rout_id := new_rout_id_set.first;
-					if feature_i.is_attribute then
-						compute_new_rout_id := not Routine_id_counter.is_attribute (new_rout_id)
-					else
-						compute_new_rout_id := Routine_id_counter.is_attribute (new_rout_id)
-					end;
+						rout_id_set_exists: new_rout_id_set /= Void
+						has_only_one: new_rout_id_set.count = 1
+					end
+					new_rout_id := new_rout_id_set.first
+					compute_new_rout_id :=
+						feature_i.is_attribute /= Routine_id_counter.is_attribute (new_rout_id)
 				else
 					if
 						old_feature /= Void and then not old_feature.is_origin
@@ -1201,26 +1197,26 @@ end;
 						-- There are no inherited assertions anymore (if there were any).
 					feature_i.set_assert_id_set (Void)
 					compute_new_rout_id := True
-				end;
+				end
 				if compute_new_rout_id then
 					create new_rout_id_set.make
-					new_rout_id := feature_i.new_rout_id;
-					new_rout_id_set.put (new_rout_id);
-					feature_i.set_rout_id_set (new_rout_id_set);
-				end;
+					new_rout_id := feature_i.new_rout_id
+					new_rout_id_set.put (new_rout_id)
+					feature_i.set_rout_id_set (new_rout_id_set)
+				end
 					-- Insertion into the system routine info table.
-				System.rout_info_table.put (new_rout_id, a_class);
+				System.rout_info_table.put (new_rout_id, a_class)
 				info := inherit_info_cache.new_inherited_info (feature_i, Void, Void)
 			else
 					-- This is either an explicit redefinition through
 					-- the redefine clause or an implicit redefinition like
 					-- an implementation of deferred features
-				inherited_info := inherit_feat.inherited_info;
+				inherited_info := inherit_feat.inherited_info
 				if inherited_info = Void then
 						-- Implicit or explicit redefinition
 					new_rout_id_set := inherit_feat.rout_id_set.twin
 						-- This is not an origin.
-					feature_i.set_is_origin (False);
+					feature_i.set_is_origin (False)
 					if
 						old_feature /= Void and then old_feature.is_origin
 					then
@@ -1248,27 +1244,28 @@ end;
 						-- will be set later by one of the routine that
 						-- calls `set_a_feature' from INHERIT_INFO.
 					info := inherit_info_cache.new_inherited_info (feature_i, Void, Void)
-					inherit_feat.set_inherited_info (info);
+					inherit_feat.set_inherited_info (info)
 						-- Store the redefinition for later
-					create redef.make (inherit_feat, info);
-					adaptations.put_front (redef);
+					create redef.make (inherit_feat, info)
+					adaptations.put_front (redef)
+					export_status := export_status.concatenation (inherit_feat.exports (feature_name_id))
 				elseif inherited_info.parent = Void then
 						-- The feature has two implementations in the class
-					create vmfn;
-					vmfn.set_class (a_class);
-					vmfn.set_a_feature (feature_i);
-					vmfn.set_inherited_feature (inherited_info.internal_a_feature);
-					Error_handler.insert_error (vmfn);
+					create vmfn
+					vmfn.set_class (a_class)
+					vmfn.set_a_feature (feature_i)
+					vmfn.set_inherited_feature (inherited_info.internal_a_feature)
+					Error_handler.insert_error (vmfn)
 				else
 						-- Name clash: a non-deferred feature is inherited
-					create vmfn1;
-					vmfn1.set_class (a_class);
-					vmfn1.set_a_feature (feature_i);
-					vmfn1.set_inherited_feature (inherited_info.internal_a_feature);
-					vmfn1.set_parent (inherited_info.parent.parent);
-					Error_handler.insert_error (vmfn1);
-				end;
-			end;
+					create vmfn1
+					vmfn1.set_class (a_class)
+					vmfn1.set_a_feature (feature_i)
+					vmfn1.set_inherited_feature (inherited_info.internal_a_feature)
+					vmfn1.set_parent (inherited_info.parent.parent)
+					Error_handler.insert_error (vmfn1)
+				end
+			end
 			if info /= Void then
 				if old_feature = Void then
 						-- Since the old feature table hasn't a feature named
@@ -1276,32 +1273,32 @@ end;
 					feature_i.set_feature_id (retrieve_feature_id (feature_i))
 				else
 						-- Take the previous feature id
-					feature_i.set_feature_id (old_feature.feature_id);
-					if old_feature.written_in = a_class.class_id then
-						if
-							(feature_i.is_attribute and not old_feature.is_attribute) or else
-							(feature_i.is_deferred and then not old_feature.is_deferred) or else
-							(feature_i.is_attribute and old_feature.is_attribute and
-								feature_i.is_origin /= old_feature.is_origin)
-						then
-							System.execution_table.add_dead_function (old_feature.body_index)
-						end
-					end;
-				end;
+					feature_i.set_feature_id (old_feature.feature_id)
+					if
+						old_feature.written_in = a_class.class_id and then
+						((feature_i.is_attribute and not old_feature.is_attribute) or else
+						(feature_i.is_deferred and then not old_feature.is_deferred) or else
+						(feature_i.is_attribute and old_feature.is_attribute and feature_i.is_origin /= old_feature.is_origin))
+					then
+						System.execution_table.add_dead_function (old_feature.body_index)
+					end
+				end
 					-- Put new feature in `inherited_features'.
-				insert_feature (feature_i);
+				insert_feature (feature_i)
 					-- Put the new feature written in the current class
 					-- in the origin table
 				if redef = Void then
-					info.set_a_feature (feature_i);
-					Origin_table.insert (info);
-				end;
-			end;
+					info.set_a_feature (feature_i)
+					Origin_table.insert (info)
+				end
+			end
 
 				-- Keep track of the origin features for pattern
 				-- processing
-			origins.extend (feature_i.feature_name_id);
-		end;
+			origins.extend (feature_i.feature_name_id)
+				-- Update export status of the feature.
+			feature_i.set_immediate_export_status (export_status, immediate_export_status)
+		end
 
 	feature_i_from_feature_as (yacc_feature: FEATURE_AS; feat: FEATURE_NAME; a_unique_counter: detachable COUNTER): FEATURE_I
 			-- Feature correponding to declaration `yacc_feature'.
@@ -1558,12 +1555,9 @@ end;
 	update_inherited_assertions
 			-- Update assert_id_set for redefined or merged routines
 			-- in adaptations.
-		local
-			redefined_features: REDEF_FEAT;
 		do
-			create redefined_features;
-			redefined_features.process (adaptations);
-		end;
+			;(create {REDEF_FEAT}).process (adaptations)
+		end
 
 	update_changed_features
 			-- Update table `changed_features' of `a_class' after a
@@ -1632,16 +1626,13 @@ end;
 		end;
 
 	check_validity2
-			-- Check if redefinitions are effectively done and does
-			-- joins an deferred features if needed
+			-- Check if redefinitions are effectively done and joins deferred features if needed.
 		require
 			inherited_features /= Void;
 		local
-			inherited_feature: FEATURE_I;
-			deferred_info: INHERIT_INFO;
-			inherit_feat: INHERIT_FEAT;
-			vdrs4: VDRS4;
-			l_features_list: ARRAYED_LIST [INHERIT_INFO]
+			deferred_info: INHERIT_INFO
+			inherit_feat: INHERIT_FEAT
+			p: PARENT_C
 		do
 			from
 					-- We iterate 'count' times so as to only call 'forth' that number of times
@@ -1653,17 +1644,14 @@ end;
 				inherit_feat := item_for_iteration
 				if inherit_feat.inherited_info = Void then
 					if inherit_feat.features.count > 0 then
-							-- Cannot find a redefinition
-						create vdrs4;
-						vdrs4.set_class (a_class);
-						vdrs4.set_feature_name (Names_heap.item (key_for_iteration))
-						Error_handler.insert_error (vdrs4);
+							-- Cannot find a redefinition.
+						Error_handler.insert_error (create {VDRS4_NO_REDECLARATION}.make (key_for_iteration, inherit_feat.features [1].parent, a_class))
 					else
 							-- Case of deferred features only
 						check
-							not inherit_feat.is_empty;
-						end;
-						deferred_info := inherit_feat.deferred_features.first;
+							not inherit_feat.is_empty
+						end
+						deferred_info := inherit_feat.deferred_features.first
 							-- New inherited feature
 
 							-- Initialization of an inherited feature
@@ -1674,35 +1662,56 @@ end;
 								-- Keep track of the feature adaptation.
 								-- The deferred features must have the same
 								-- signature
-							adaptations.put_front (create {JOIN}.make (inherit_feat, deferred_info));
-debug ("ACTIVITY")
-	io.put_string ("joining feature: ");
-	io.put_string (inherited_feature.feature_name);
-	io.put_string ("%N%Tfrom class: ");
-	io.put_string (inherited_feature.written_class.name);
-	io.put_new_line;
-end;
-						end;
-					end;
+							adaptations.put_front (create {JOIN}.make (inherit_feat, deferred_info))
+						end
+					end
 				else
 						-- Inherited info has been set
-					if inherit_feat.features.count > 1 and then inherit_feat.inherited_info.internal_a_feature.written_in /= a_class.class_id then
-							-- We have a repeatedly inherited feature that is not defined in current class.
-							-- We need to check for any erroneous redefinitions, if so then raise VDRS-4 error
-						from
-							l_features_list := inherit_feat.features
-							l_features_list.start
-						until
-							l_features_list.after
-						loop
-							if l_features_list.item.parent.is_redefining (l_features_list.item.internal_a_feature.feature_name_id) then
-									-- We have an erroneous redefinition
-								create vdrs4;
-								vdrs4.set_class (a_class);
-								vdrs4.set_feature_name (Names_heap.item (l_features_list.item.internal_a_feature.feature_name_id))
-								Error_handler.insert_error (vdrs4);
+					if inherit_feat.inherited_info.internal_a_feature.written_in = a_class.class_id then
+							-- The feature is declared in the current class.
+						if
+							not inherit_feat.inherited_info.internal_a_feature.is_deferred and then
+							inherit_feat.has_deferred
+						then
+								-- A redeclaration into an effective feature.
+								-- It should not be a redefinition of a deferred feature.
+							across
+								inherit_feat.deferred_features as f
+							loop
+								p := f.item.parent
+								if
+									p.is_redefining (f.item.internal_a_feature.feature_name_id) and then
+										-- Report the error only if all features inherited from this parent are deferred.
+									across inherit_feat.features as e all e.item.parent /= p end
+								then
+									Error_handler.insert_error (create {VDRS4_EFFECTING}.make (f.item.internal_a_feature.feature_name_id, p, a_class))
+								end
 							end
-							l_features_list.forth
+						end
+					else
+						if inherit_feat.features.count > 1 then
+								-- We have a repeatedly inherited feature that is not defined in current class.
+								-- We need to check for any erroneous redefinitions, if so then raise VDRS-4 error.
+							across
+								inherit_feat.features as f
+							loop
+								p := f.item.parent
+								if p.is_redefining (f.item.internal_a_feature.feature_name_id) then
+										-- We have an erroneous redefinition.
+									Error_handler.insert_error (create {VDRS4_NO_REDECLARATION}.make (f.item.internal_a_feature.feature_name_id, p, a_class))
+								end
+							end
+						end
+						if inherit_feat.has_deferred then
+							across
+								inherit_feat.deferred_features as f
+							loop
+								p := f.item.parent
+								if p.is_redefining (f.item.internal_a_feature.feature_name_id) then
+										-- We have an erroneous redefinition.
+									Error_handler.insert_error (create {VDRS4_NO_REDECLARATION}.make (f.item.internal_a_feature.feature_name_id, p, a_class))
+								end
+							end
 						end
 					end
 				end
@@ -1742,12 +1751,14 @@ end;
 				-- We need to aliasing if not already done
 				inherit_info.copy_a_feature_for_feature_table
 				inherit_info.a_feature.set_has_property (False)
-				if a_class.is_single then
+				if
+					a_class.is_single and then
 						-- Feature getters and setters may have been generated so we reset.
-					if inherit_feat.inherited_info /= Void and then inherit_feat.inherited_info.parent.parent.is_single then
-						inherit_info.a_feature.set_has_property_getter (False)
-						inherit_info.a_feature.set_has_property_setter (False)
-					end
+					attached inherit_feat.inherited_info as i and then
+					i.parent.parent.is_single
+				then
+					inherit_info.a_feature.set_has_property_getter (False)
+					inherit_info.a_feature.set_has_property_setter (False)
 				end
 			end
 
@@ -2019,9 +2030,9 @@ feature {NONE} -- Temporary body index
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
-	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
-	licensing_options:	"http://www.eiffel.com/licensing"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
+	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
+	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[
 			This file is part of Eiffel Software's Eiffel Development Environment.
 			
@@ -2051,15 +2062,3 @@ note
 		]"
 
 end
-
-
-
-
-
-
-
-
-
-
-
-

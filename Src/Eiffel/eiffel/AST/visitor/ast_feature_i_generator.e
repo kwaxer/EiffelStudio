@@ -84,6 +84,9 @@ feature -- Factory
 				if attached {ATTRIBUTE_I} Result as a and then i.is_transient then
 					a.set_is_transient (True)
 				end
+				if i.is_ghost then
+					Result.set_is_ghost (True)
+				end
 				if a_node.property_name /= Void then
 					Result.set_has_property (True)
 					if Result.type.is_void then
@@ -260,10 +263,6 @@ feature {NONE} -- Implementation
 									create {DYN_FUNC_I} l_func
 								end
 							end
-						elseif current_class.is_basic then
-								-- All built_in in basic classes are empty routines if not specified otherwise
-								-- as they are inlined by SPECIAL_FEATURES/IL_SPECIAL_FEATURES
-							create {DYN_FUNC_I} l_func
 						end
 					end
 					if l_result = Void and l_func = Void then
@@ -385,7 +384,7 @@ feature {NONE} -- Implementation
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

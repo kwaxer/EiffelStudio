@@ -1,10 +1,14 @@
 ﻿note
-	description: "Instance of an Eiffel feature: for every inherited feature there is%N%
-		%an instance of FEATURE_I with its final name, the class name where it%N%
-		%is written, the body id of its content and the routine table ids to%N%
-		%which the feature is attached.%N%
-		%Attribute `type' is the real type of the feature in the class where it%N%
-		%is inherited (or written), that means there is no more anchored type."
+	description: "[
+			Instance of an Eiffel feature.
+			
+			For every inherited feature there is an instance of FEATURE_I with its final name,
+			the class name where it is written, the body id of its content and
+			the routine table ids to which the feature is attached.
+			
+			Attribute `type` is the real type of the feature in the class where it
+			is inherited (or written), that means there is no more anchored type.
+		]"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
 	date: "$Date$"
@@ -160,6 +164,47 @@ feature -- Access
 			end
 		ensure
 			export_status_not_void: export_status /= Void
+		end
+
+	immediate_export_status: EXPORT_I
+			-- Export status of the feature declaration without taking inheritance into account.
+			-- Use with care: the function is slow when the feature is selectively exported.
+		local
+			f: like feature_flags
+		do
+			f := feature_flags
+			if f & is_immediate_export_status_all_mask /= 0 then
+				Result := export_all_status
+			elseif f & is_immediate_export_status_none_mask /= 0 then
+				Result := export_none_status
+			else
+				if
+					written_in /= 0 and then
+					attached written_class.ast.features as cs
+				then
+						-- Retrieve the export status from the AST.
+					across
+						cs as c
+					until
+						attached Result
+					loop
+						if attached c.item.features as fs then
+							across
+								fs as h
+							until
+								attached Result
+							loop
+								if attached h.item.feature_with_name (feature_name_id) then
+									Result := export_status_generator.feature_clause_export_status (system, written_class, c.item)
+								end
+							end
+						end
+					end
+				end
+				if not attached Result then
+					Result := export_none_status
+				end
+			end
 		end
 
 	origin_feature_id: INTEGER
@@ -635,6 +680,12 @@ feature -- Status
 			Result := a_class.class_id = written_in or else is_replicated_directly
 		end
 
+	is_ghost: BOOLEAN
+			-- Is this a ghost feature, i.e. the one that should not be generated?
+		do
+			Result := feature_flags & is_ghost_mask /= 0
+		end
+
 feature -- Setting
 
 	set_feature_id (i: INTEGER)
@@ -723,17 +774,43 @@ feature -- Setting
 
 	set_export_status (e: EXPORT_I)
 			-- Assign `e' to `export_status'.
+			-- See also: `set_immediate_export_status`.
 		require
 			e_not_void: e /= Void
 		do
-			if e.is_all or e.is_none then
+				-- Reset export status flags.
+			feature_flags := feature_flags & is_export_status_none_mask.bit_not
+				-- Update export status flags.
+			if e.is_all then
 				internal_export_status := Void
-				feature_flags := feature_flags.set_bit_with_mask (e.is_none, is_export_status_none_mask)
+			elseif e.is_none then
+				internal_export_status := Void
+				feature_flags := feature_flags | is_export_status_none_mask
 			else
 				internal_export_status := e
 			end
 		ensure
 			export_status_set: export_status.same_as (e)
+		end
+
+	set_immediate_export_status (e, i: EXPORT_I)
+			-- Assign export status `e` to `export_status` and record immedate export status `i` of the feature (if possible).
+			-- See also: `set_export_status`.
+		do
+				-- Reset immediate export status flags.
+			feature_flags := feature_flags &
+				(is_immediate_export_status_none_mask |
+				is_immediate_export_status_all_mask).bit_not
+				-- Update immediate export status flags.
+			if i.is_all then
+				feature_flags := feature_flags | is_immediate_export_status_all_mask
+			elseif i.is_none then
+				feature_flags := feature_flags | is_immediate_export_status_none_mask
+			end
+			set_export_status (e)
+		ensure
+			export_status_set: export_status.same_as (e)
+			immediate_export_status_set: immediate_export_status.same_as (i)
 		end
 
 	frozen set_is_origin (b: BOOLEAN)
@@ -1032,6 +1109,14 @@ feature -- Setting
 			feature_flags := feature_flags.set_bit_with_mask (v, is_type_evaluation_delayed_mask)
 		end
 
+	set_is_ghost (v: BOOLEAN)
+			-- Set `is_ghost' to `v'.
+		do
+			feature_flags := feature_flags.set_bit_with_mask (v, is_ghost_mask)
+		ensure
+			is_ghost_set: is_ghost = v
+		end
+
 feature {INTERNAL_COMPILER_STRING_EXPORTER} -- Setting
 
 	set_feature_name (s: STRING)
@@ -1085,6 +1170,7 @@ feature -- Incrementality
 				and then (has_property implies property_name.is_equal (other.property_name))
 				and then has_property_getter = other.has_property_getter
 				and then has_property_setter = other.has_property_setter
+				and then is_ghost = other.is_ghost
 debug ("ACTIVITY")
 	if not Result then
 			io.error.put_boolean (written_in = other.written_in) io.error.put_new_line;
@@ -1168,55 +1254,34 @@ end
 			-- [Semantics for second pass is `old_feat.same_interface (new)']
 		require
 			good_argument: other /= Void
---			export_statuses_exist: not (export_status = Void
---										or else	other.export_status = Void)
 		do
-				-- Still an attribute
-			Result := is_attribute = other.is_attribute
-
-				-- Same alias
-			if Result then
-				Result := alias_name_id = other.alias_name_id
-				if Result then
-					Result := has_convert_mark = other.has_convert_mark
-				end
-			end
-
-				-- Same assigner procedure
-			if Result then
-				Result := assigner_name_id = other.assigner_name_id
-			end
-
-				-- Same return type
-			Result := Result and then type.same_as (other.type)
---						and then export_status.equiv (other.export_status)
-
-				-- Same arguments if any
-			if Result then
-				if argument_count = 0 then
-					Result := other.argument_count = 0
-				else
-					Result := argument_count = other.argument_count
-							and then arguments.same_interface (other.arguments)
-				end
-			end
-
-				-- Still a once
-			Result := Result and then is_once = other.is_once
-				-- Still the same kind of once
-			Result := Result and then
-						is_process_or_thread_relative_once = other.is_process_or_thread_relative_once and then
-						is_process_relative = other.is_process_relative and then
-						is_object_relative_once = other.is_object_relative_once
-
-				-- Of the same stability.
-			Result := Result and then is_stable = other.is_stable
-
-				-- Of the same use of current object.
-			Result := Result and then is_class = other.is_class
-
-				-- Of the same volatility.
-			Result := Result and then is_transient = other.is_transient
+			Result :=
+					-- Still an attribute.
+				is_attribute = other.is_attribute and then
+					-- Same alias.
+				alias_name_id = other.alias_name_id and then
+				has_convert_mark = other.has_convert_mark and then
+					-- Same assigner procedure.
+				assigner_name_id = other.assigner_name_id and then
+					-- Same return type.
+				type.same_as (other.type) and then
+					-- Same arguments if any.
+				argument_count = other.argument_count and then
+				(argument_count /= 0 implies arguments.same_interface (other.arguments)) and then
+					-- Still a once.
+				is_once = other.is_once and then
+					-- Still the same kind of once.
+				is_process_or_thread_relative_once = other.is_process_or_thread_relative_once and then
+				is_process_relative = other.is_process_relative and then
+				is_object_relative_once = other.is_object_relative_once and then
+					-- Of the same stability.
+				is_stable = other.is_stable and then
+					-- Of the same use of current object.
+				is_class = other.is_class and then
+					-- Of the same volatility.
+				is_transient = other.is_transient and then
+					-- Of the same ghost status.
+				is_ghost = other.is_ghost
 		end
 
 feature -- creation of default rescue clause
@@ -1977,7 +2042,7 @@ feature -- Polymorphism
 	 			if seed.has_formal then
 	 					-- This is an attribute with a seed of a formal generic type that may become expanded.
 	 				create {GENERIC_ATTRIBUTE_TABLE} Result.make (rout_id, True)
-	 			elseif not  seed.type.actual_type.is_expanded then
+	 			elseif not seed.type.actual_type.is_expanded then
 	 					-- This is an attribute with a seed of a non-expanded type that may require initialization.
 	 				create {GENERIC_ATTRIBUTE_TABLE} Result.make (rout_id, False)
 	 			else
@@ -1987,55 +2052,90 @@ feature -- Polymorphism
 	 		end
  		end
 
- 	new_entry (rout_id: INTEGER): ENTRY
- 			-- New polymorphic unit
+ 	new_entry (context_type: CLASS_TYPE; rout_id: INTEGER; is_class_deferred: BOOLEAN; class_id: like {CLASS_C}.class_id): ENTRY
+ 			-- New polymorphic unit for the version of routine ID `rout_id` in the context type `class_type` of the class of ID `class_id`
+ 			-- that is deferred or not according to `is_class_deferred`.
  		require
 			rout_id_not_void: rout_id /= 0
+			rout_id_valid: rout_id_set.has (rout_id)
 		local
 			r: like new_rout_entry
  		do
- 			if is_attribute and then Routine_id_counter.is_attribute (rout_id) then
- 				if byte_context.workbench_mode or else has_formal  then
-	 				r := new_rout_entry
-	 				r.set_is_attribute
-	 				Result := r
- 				else
-	 				Result := new_attr_entry
- 				end
- 			else
- 				Result := new_rout_entry
+ 			if not is_attribute or else not Routine_id_counter.is_attribute (rout_id) then
+ 				Result := new_rout_entry (context_type, is_class_deferred, class_id)
+ 			elseif byte_context.workbench_mode or else has_formal then
+				r := new_rout_entry (context_type, is_class_deferred, class_id)
+				r.set_is_attribute
+				Result := r
+			else
+				Result := new_attr_entry (context_type, is_class_deferred, class_id)
  			end
  		end
 
- 	new_rout_entry: ROUT_ENTRY
- 			-- New routine unit
- 		do
- 			create Result
- 			Result.set_body_index (body_index)
-			Result.set_type_a (type)
+	rout_entry_type: ROUT_ENTRY
+			-- A type to be returned by `new_rout_entry`.
+		require
+			false
+		do
+			check from_precondition: false then end
+		ensure
+			class
+			false
+		end
 
+ 	new_rout_entry (t: CLASS_TYPE; d: BOOLEAN; c: like {CLASS_C}.class_id): like rout_entry_type
+ 			-- New routine unit for a target type `t` of the class of ID `c`
+ 			-- that is deferred according to `d`.
+ 		require
+ 			valid_class_id: system.has_existing_class_of_id (c)
+ 			known_class: attached system.class_of_id (c) as compiled_class
+ 			known_invariant: is_invariant implies compiled_class.invariant_feature.feature_id = feature_id
+ 			known_feature: not is_invariant implies attached compiled_class.feature_of_feature_id (feature_id)
+ 			consistent_target_type: t.associated_class.class_id = c
+ 			consistent_deferred_status: compiled_class.is_deferred = d
+ 		local
+ 			access_class_id: like access_in
+ 			access_type_id: INTEGER
+ 			written_type_id: INTEGER
+ 			entry_written_type: CLASS_TYPE
+ 		do
+ 			entry_written_type := written_class.meta_type (t)
+			written_type_id := entry_written_type.type_id
  			if has_replicated_ast then
  					-- If AST has been replicated, then we must use `access_in'
  					-- as this is the new written in value.
- 				Result.set_access_in (access_in)
+ 				access_class_id := access_in
+				access_type_id := access_class.meta_type (t).type_id
  			else
- 				Result.set_access_in (written_in)
+ 				access_class_id := written_in
+				access_type_id := written_type_id
  			end
-			Result.set_written_in (written_in)
-
- 			Result.set_pattern_id (pattern_id)
-			Result.set_feature_id (feature_id)
-			Result.set_is_deferred (is_deferred)
+ 			create Result.make
+ 				(result_type_in (t),
+ 				t.type_id,
+ 				feature_id,
+ 				is_deferred,
+ 				body_index,
+ 				pattern_table.c_pattern_id_in (pattern_id, entry_written_type),
+ 				access_type_id,
+ 				access_class_id,
+ 				written_in,
+ 				d,
+ 				c)
  		end
 
- 	new_attr_entry: ATTR_ENTRY
- 			-- New attribute unit
+ 	new_attr_entry (t: CLASS_TYPE; d: BOOLEAN; c: like {CLASS_C}.class_id): ATTR_ENTRY
+ 			-- New attribute unit for a target type `t` of the class of ID `c`
+ 			-- that is deferred according to `d`.
  		require
  			is_attribute: is_attribute
+ 			valid_class_id: system.has_existing_class_of_id (c)
+ 			known_class: attached system.class_of_id (c) as compiled_class
+ 			known_feature: attached compiled_class.feature_of_feature_id (feature_id)
+ 			consistent_target_type: t.associated_class.class_id = c
+ 			consistent_deferred_status: compiled_class.is_deferred = d
  		do
- 			create Result
-			Result.set_type_a (type)
- 			Result.set_feature_id (feature_id)
+ 			create Result.make (result_type_in (t), t.type_id, feature_id, d, c)
  		end
 
  	poly_equiv (other: FEATURE_I): BOOLEAN
@@ -2150,6 +2250,26 @@ feature -- Signature instantiation
 					l_arguments.put_i_th (new_type, i)
 				end
 				i := i + 1
+			end
+		end
+
+	result_type_in (t: CLASS_TYPE): TYPE_A
+			-- Result type adapted to the target type `t`.
+		local
+			base_type: CL_TYPE_A
+		do
+			Result := type
+			if Result.is_like_current then
+					-- We need to instantiate `like Current' in the context of `class_type'
+					-- to fix eweasel test#exec035.
+					-- Associated actual type is always attached.
+					-- Use the basic version of the class type if available.
+				base_type := t.basic_type
+				if not attached base_type then
+						-- Otherwise, use the regular version of the class type.
+					base_type := t.type
+				end
+				Result := Result.instantiated_in (base_type.as_attached_in (t.associated_class))
 			end
 		end
 
@@ -3075,6 +3195,7 @@ feature -- Undefinition
 			Result.set_has_rescue_clause (has_rescue_clause)
 			Result.set_is_type_evaluation_delayed (is_type_evaluation_delayed)
 			Result.set_has_replicated_ast (has_replicated_ast)
+			Result.set_is_ghost (is_ghost)
 		ensure
 			Result_exists: Result /= Void
 			Result_is_deferred: Result.is_deferred
@@ -3198,6 +3319,7 @@ feature -- Replication
 			other.set_is_hidden_in_debugger_call_stack (is_hidden_in_debugger_call_stack)
 			other.set_body_index (body_index)
 			other.set_is_type_evaluation_delayed (is_type_evaluation_delayed)
+			other.set_is_ghost (is_ghost)
 		end
 
 	transfer_from (other: FEATURE_I)
@@ -3332,7 +3454,7 @@ feature -- Byte code access
 	access_for_feature (access_type: TYPE_A; static_type: TYPE_A; is_qualified: BOOLEAN; is_separate: BOOLEAN; is_free: BOOLEAN): ACCESS_B
 			-- Byte code access for current feature. Dynamic binding if
 			-- `static_type' is Void, otherwise static binding on `static_type'.
-			-- • is_free – Is the access instance-free?
+			-- • `is_free` – Is it a non-object call?
 		require
 			access_type_not_void: access_type /= Void
 			-- is_separate_meaningful: is_separate implies (is_qualified or is_creation) -- Creation calls are not marked as qualified.
@@ -3370,6 +3492,15 @@ feature -- Byte code access
 			end
 		ensure
 			Result_exists: Result /= Void
+		end
+
+	direct_access_for_feature (access_type: TYPE_A; static_type: TYPE_A; is_qualified: BOOLEAN; is_separate: BOOLEAN; is_free: BOOLEAN): ACCESS_B
+			-- Byte code access for this feature that is known to be called without any wrappers.
+			-- Dynamic binding if `static_type` is Void, otherwise static binding on `static_type`.
+			-- • `is_free` – Is it a non-object call?
+			-- See also: `access_for_feature`.
+		do
+			Result := access_for_feature (access_type, static_type, is_qualified, is_separate, is_free)
 		end
 
 feature {NONE} -- log file
@@ -3544,6 +3675,7 @@ feature -- Api creation
 			Result.set_is_prefix (is_prefix)
 			Result.set_rout_id_set (rout_id_set)
 			Result.set_is_il_external (is_il_external)
+			Result.set_ghost (is_ghost)
 			if is_inline_agent then
 				if attached {E_ROUTINE} Result as r then
 					r.set_enclosing_body_id (enclosing_body_id)
@@ -3594,6 +3726,9 @@ feature {FEATURE_I} -- Feature flags
 	has_non_object_call_mask: NATURAL_64 =				0x0002_0000_0000
 	has_non_object_call_in_assertion_mask: NATURAL_64 =				0x0004_0000_0000
 	has_unqualified_call_in_assertion_mask: NATURAL_64 =				0x0008_0000_0000
+	is_ghost_mask: NATURAL_64 =				0x0010_0000_0000
+	is_immediate_export_status_none_mask: NATURAL_64 = 0x0020_0000_0000
+	is_immediate_export_status_all_mask: NATURAL_64 = 0x0040_0000_0000
 			-- Mask used for each feature property.
 
 feature {FEATURE_I} -- Implementation
@@ -3661,9 +3796,9 @@ invariant
 
 note
 	ca_ignore:
-		"CA033", "CA033 — very long class",
-		"CA082", "CA082 — missing redeclaration of `is_equal`"
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+		"CA033", "CA033: very long class",
+		"CA082", "CA082: missing redeclaration of `is_equal`"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

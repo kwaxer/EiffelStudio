@@ -100,6 +100,12 @@ feature -- Access
 
 feature -- Element change
 
+	reset_pop_widget
+			-- Reset `popup_widget`.
+		do
+			internal_popup_widget := Void
+		end
+
 	set_popup_widget (a_widget: like popup_widget)
 			-- Assign popup widget to be displayed when the popup button is select
 			-- Note: Already displayed widgets will have the UI replaced and reshown.
@@ -277,7 +283,7 @@ feature {NONE} -- Implementation
 			-- Cached version of `popup_widget'
 
 ;note
-	copyright:	"Copyright (c) 1984-2014, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

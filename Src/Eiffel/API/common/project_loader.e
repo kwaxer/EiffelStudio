@@ -66,6 +66,8 @@ inherit
 
 	CONF_ACCESS
 
+	CONF_FILE_CONSTANTS
+
 	SHARED_COMPILER_PROFILE
 
 feature -- Loading
@@ -111,7 +113,7 @@ feature -- Loading
 						-- Unknown extension, let's try as an ecf.
 					config_file_name := a_file_name
 					create l_load_config.make (l_factory)
-					l_load_config.retrieve_configuration (config_file_name.name)
+					l_load_config.retrieve_and_check_configuration (config_file_name.name)
 					if l_load_config.is_error and l_load_config.is_invalid_xml then
 							-- Could not load the file, but it was not XML.
 						l_load_config := Void
@@ -130,7 +132,7 @@ feature -- Loading
 				if l_load_config = Void then
 						-- We try to load it as a normal config file.
 					create l_load_config.make (l_factory)
-					l_load_config.retrieve_configuration (config_file_name.name)
+					l_load_config.retrieve_and_check_configuration (config_file_name.name)
 				end
 				if l_load_config.is_error then
 					report_cannot_read_config_file (config_file_name, l_load_config.last_error)
@@ -173,7 +175,8 @@ feature -- Loading
 
 								lace.check_precompile
 								if lace.is_precompile_invalid then
--- print error message
+									-- FIXME: handle invalid precompile !
+									-- print ("precompile is invalid!!!%N")
 								elseif lace.is_precompilation_needed then
 									ask_compile_precompile (lace.precompile)
 									if is_user_wants_precompile then
@@ -230,7 +233,7 @@ feature -- Loading
 			if l_file.exists then
 					-- ecf exists, load it
 				create l_load.make (l_factory)
-				l_load.retrieve_configuration (l_config_file_name.name)
+				l_load.retrieve_and_check_configuration (l_config_file_name.name)
 				if l_load.is_error then
 						-- ecf could not be loaded, an error will be triggered
 						-- later when the config file will be loaded again by
@@ -260,7 +263,7 @@ feature -- Loading
 					-- ecf does not exist, create it
 
 					-- Configuration system
-				l_system := l_factory.new_system_generate_uuid_with_file_name (l_config_file_name.name, l_target_name)
+				l_system := l_factory.new_system_generate_uuid_with_file_name (l_config_file_name.name, l_target_name, latest_namespace)
 				l_system.set_file_name (l_config_file_name.name)
 
 					-- Add the target for single file compilation
@@ -533,7 +536,7 @@ feature {NONE} -- Settings
 				Eiffel_project.make (compiler_project_location)
 
 				if not eiffel_project.error_occurred then
-					check_used_environemnt
+					check_used_environment
 					report_project_loaded_successfully
 				else
 					if Eiffel_project.retrieval_error then
@@ -579,7 +582,7 @@ feature {NONE} -- Settings
 			end
 		end
 
-	check_used_environemnt
+	check_used_environment
 			-- Check if the current environment values still have the same values as the ones stored in the project settings.
 		local
 			l_envs: STRING_TABLE [READABLE_STRING_GENERAL]
@@ -608,7 +611,7 @@ feature {NONE} -- Settings
 					if
 						not l_key.is_case_insensitive_equal (eiffel_layout.default_il_environment.ise_dotnet_framework_env) and then
 						not l_key.is_case_insensitive_equal ({EIFFEL_CONSTANTS}.ise_precomp_env) and then
-						not equal (l_new_val, l_old_val)
+						not same_environment_variable_value (l_new_val, l_old_val)
 					then
 						ask_environment_update (l_key, l_old_val, l_new_val)
 						if is_update_environment then
@@ -624,6 +627,19 @@ feature {NONE} -- Settings
 					end
 					l_envs.forth
 				end
+			end
+		end
+
+	same_environment_variable_value (v1,v2: detachable READABLE_STRING_GENERAL): BOOLEAN
+			-- Are `v1` and `v2` represent the same variable value?
+			-- note: empty or Void value are considered the same.
+		do
+			if v1 = Void then
+				Result := v2 = Void or else v2.is_empty
+			elseif v2 = Void then
+				Result := v1.is_empty
+			else
+				Result := v1.same_string (v2)
 			end
 		end
 
@@ -651,6 +667,8 @@ feature {NONE} -- Settings
 					eiffel_project.make_new (l_dir, compiler_project_location, True, deletion_agent, cancel_agent)
 					if is_deletion_cancelled then
 						set_has_error
+					elseif workbench.system_defined then
+						system.reset_all
 					end
 				end
 			else
@@ -780,60 +798,85 @@ feature {NONE} -- Settings
 		local
 			l_not_found: BOOLEAN
 			l_list: ARRAYED_LIST [READABLE_STRING_GENERAL]
+			l_infos: detachable STRING_TABLE [TUPLE [text: READABLE_STRING_GENERAL; is_error: BOOLEAN]]
 			l_targets: STRING_TABLE [CONF_TARGET]
 			l_user_options_factory: USER_OPTIONS_FACTORY
 			l_last_target: READABLE_STRING_GENERAL
 			l_last_target_matched: BOOLEAN
 			l_sorter: QUICK_SORTER [READABLE_STRING_GENERAL]
+			l_parent_checker: detachable CONF_PARENT_TARGET_CHECKER
+			t: READABLE_STRING_GENERAL
+			obs: CONF_ERROR_CONTAINER
 		do
-			l_targets := a_system.compilable_targets
-			if a_proposed_target /= Void then
-				target_name := a_proposed_target.as_lower
-
-				l_targets.search (target_name)
-				if not l_targets.found then
-					l_not_found := True
-					target_name := Void
-				end
+				-- `a_system.compilable_targets` needs to know the eventual parent of target.
+				-- mostly to know about the root entry point if any.
+			create obs
+			create l_parent_checker.make_with_observer (create {CONF_PARSE_FACTORY}, obs)
+			l_parent_checker.resolve_system (a_system)
+			if l_parent_checker.has_cycle_error then
+				report_cannot_read_config_file (a_system.file_path, obs.last_errors.last)
+				set_has_error
 			else
-				l_not_found := True
-			end
-			if l_not_found then
-					-- Try and find the previously used target.
-				create l_user_options_factory
-				l_user_options_factory.load (a_system.file_name)
-				if
-					l_user_options_factory.successful and then
-					attached l_user_options_factory.last_options as l_options
-				then
-					l_last_target := l_options.target_name
-				else
-					l_last_target := ""
-				end
-
-					-- Order targets in alphabetical order after last selected target (if any)
-				from
-					create l_list.make (l_targets.count)
-					l_targets.start
-				until
-					l_targets.after
-				loop
-					if l_last_target ~ l_targets.key_for_iteration then
-							-- We want the last target first in the list.
-						l_last_target_matched := True
-					else
-						l_list.extend (l_targets.key_for_iteration)
+				l_targets := a_system.compilable_targets
+				if a_proposed_target /= Void then
+					target_name := a_proposed_target
+					l_targets.search (target_name)
+					if not l_targets.found then
+						l_not_found := True
+						target_name := Void
 					end
-					l_targets.forth
+				else
+					l_not_found := True
 				end
-				create l_sorter.make (create {COMPARABLE_COMPARATOR [READABLE_STRING_GENERAL]})
-				l_sorter.sort (l_list)
-				if l_last_target_matched then
-						-- Set the last used target as first in the list.
-					l_list.start
-					l_list.put_left (l_last_target)
+				if l_not_found then
+						-- Try and find the previously used target.
+					create l_user_options_factory
+					l_user_options_factory.load (a_system.file_name)
+					if
+						l_user_options_factory.successful and then
+						attached l_user_options_factory.last_options as l_options
+					then
+						l_last_target := l_options.target_name
+					else
+						l_last_target := ""
+					end
+
+						-- Order targets in alphabetical order after last selected target (if any)
+					from
+						create l_list.make (l_targets.count)
+						l_targets.start
+					until
+						l_targets.after
+					loop
+						t := l_targets.key_for_iteration
+						if t.is_case_insensitive_equal (l_last_target) then
+								-- We want the last target first in the list.
+							l_last_target_matched := True
+						else
+							l_list.extend (t)
+						end
+						if attached l_targets.item_for_iteration.parent_reference as par and then attached par.associated_error as err then
+							if l_infos = Void then
+								create l_infos.make (1)
+							end
+							l_infos.force ([err.text, True], t)
+						elseif attached l_targets.item_for_iteration.description as desc then
+							if l_infos = Void then
+								create l_infos.make (1)
+							end
+							l_infos.force ([desc, False], t)
+						end
+						l_targets.forth
+					end
+					create l_sorter.make (create {COMPARABLE_COMPARATOR [READABLE_STRING_GENERAL]})
+					l_sorter.sort (l_list)
+					if l_last_target_matched then
+							-- Set the last used target as first in the list.
+						l_list.start
+						l_list.put_left (l_last_target)
+					end
+					ask_for_target_name (a_proposed_target, l_list, l_infos)
 				end
-				ask_for_target_name (a_proposed_target, l_list)
 			end
 		ensure
 			target_name_set: not has_error implies target_name /= Void and then not target_name.is_empty
@@ -956,7 +999,7 @@ feature {NONE} -- Error reporting
 
 feature {NONE} -- User interaction
 
-	ask_for_target_name (a_target: READABLE_STRING_GENERAL; a_targets: ARRAYED_LIST [READABLE_STRING_GENERAL])
+	ask_for_target_name (a_target: READABLE_STRING_GENERAL; a_targets: ARRAYED_LIST [READABLE_STRING_GENERAL]; a_info: detachable STRING_TABLE [TUPLE [text: READABLE_STRING_GENERAL; is_error: BOOLEAN]])
 			-- Ask user to choose one target among `a_targets'.
 			-- If not Void, `a_target' is the one selected by user.
 		require
@@ -1140,8 +1183,8 @@ feature {NONE} -- Implementation
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2016, Eiffel Software"
-	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
+	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[
 			This file is part of Eiffel Software's Eiffel Development Environment.

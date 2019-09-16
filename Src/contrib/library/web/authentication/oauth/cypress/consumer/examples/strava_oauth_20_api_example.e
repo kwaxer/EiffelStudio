@@ -19,7 +19,6 @@ feature {NONE} -- Creation
 			api_service: OAUTH_SERVICE_I
 			request: OAUTH_REQUEST
 			access_token: detachable OAUTH_TOKEN
-			current_code: detachable STRING
 			encode: UTF8_URL_ENCODER
 			l_string: STRING
 		do
@@ -38,7 +37,7 @@ feature {NONE} -- Creation
 					print ("%NNow we're going to access a protected resource: " + protected_resource_url + "%N")
 					create request.make ("GET", protected_resource_url)
 					request.add_header ("Authorization", "Bearer " + l_access_token.token)
-					if attached {OAUTH_RESPONSE} request.execute as l_response then
+					if attached request.execute as l_response then
 						print ("%NOk, let see what we found...%N")
 						print ("%N%TResponse: STATUS" + l_response.status.out)
 						if attached l_response.body as l_body then
@@ -50,19 +49,19 @@ feature {NONE} -- Creation
 		end
 
 feature {NONE} -- Implementation
-	
+
 	authorization_code (a_request_url: READABLE_STRING_GENERAL): STRING
 			-- The authorization token as computed by calling `a_request_url'
 		local
 			socket: NETWORK_STREAM_SOCKET
-			callback_string, code: STRING
+			callback_string: STRING
 			code_index: INTEGER
 		do
 			(create {EXECUTION_ENVIRONMENT}).system ("open -a Google\ Chrome '" + a_request_url + "'")
 			Result := ""
 	    	create socket.make_server_by_port(9991)
 			socket.listen(5)
-			socket.set_timeout (10)
+			socket.set_timeout_ns (10)
 			socket.accept
 			if attached socket.accepted as accepted_socket then
 				from
@@ -91,8 +90,18 @@ feature {NONE} -- Implementation
 
 feature {NONE} -- Configuration
 
-	api_key : STRING ="899"
-	api_secret :STRING ="6d3570028fcb372d49d7abebeb9a4c62a92d3831"
+	api_key : STRING =""
+	api_secret :STRING =""
 	protected_resource_url : STRING = "https://www.strava.com/api/v3/athlete"
 
+note
+	copyright: "2013-2019, Javier Velilla, Jocelyn Fiat, Eiffel Software and others"
+	license: "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
+	source: "[
+			Eiffel Software
+			5949 Hollister Ave., Goleta, CA 93117 USA
+			Telephone 805-685-1006, Fax 805-685-6869
+			Website http://www.eiffel.com
+			Customer support http://support.eiffel.com
+		]"
 end

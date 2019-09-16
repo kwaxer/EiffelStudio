@@ -28,6 +28,7 @@ note
 	EIS: "name=mailto-RFC2368", "protocol=URI", "src=http://tools.ietf.org/html/rfc2368"
 	EIS: "name=ipv6-RFC2373", "protocol=URI", "src=http://tools.ietf.org/html/rfc2373"
 	EIS: "name=ipv6-RFC2373 in URL", "protocol=URI", "src=http://tools.ietf.org/html/rfc2732"
+	EIS: "name=RFC3490 Internationalizing Domain Names in Applications (IDNA)", "protocol=URI", "src=https://tools.ietf.org/html/rfc3490"
 
 class
 	URI
@@ -70,7 +71,7 @@ feature {NONE} -- Initialization
 					q := a_string.index_of ('@', p + 1)
 					if q > 0 and (r = 0 or q < r) then
 							--| found user:passwd
-						t := a_string.substring (p + 1, q - 1)
+						t := a_string.substring (p + 1, q - 1).to_string_8
 						set_userinfo (t)
 						p := q
 						q := a_string.index_of ('/', p + 1)
@@ -82,10 +83,10 @@ feature {NONE} -- Initialization
 						q := qq
 					end
 					if q > 0 then
-						t := a_string.substring (p + 1, q - 1)
+						t := a_string.substring (p + 1, q - 1).to_string_8
 					else
 						q := a_string.count
-						t := a_string.substring (p + 1, q)
+						t := a_string.substring (p + 1, q).to_string_8
 						q := 0 --| end of processing						
 					end
 					if not t.is_empty and then t[1] = '[' then
@@ -119,7 +120,7 @@ feature {NONE} -- Initialization
 
 				if q > 0 and q <= a_string.count then
 						--| found query
-					t := a_string.substring (q, a_string.count)
+					t := a_string.substring (q, a_string.count).to_string_8
 					q := t.index_of ('?', 1)
 					if q > 0 then
 						s := t.substring (1, q - 1)
@@ -157,19 +158,13 @@ feature {NONE} -- Initialization
 			if is_valid then
 				check_validity (True)
 			end
-		ensure
-			same_if_valid: is_valid and not is_corrected implies a_string.starts_with (string)
 		end
 
-	make_with_details (a_scheme: READABLE_STRING_8; a_host: detachable READABLE_STRING_8; a_path: READABLE_STRING_8)
+	make_with_details (a_scheme: READABLE_STRING_8; a_host: detachable READABLE_STRING_GENERAL; a_path: READABLE_STRING_8)
 			-- Create Current uri from scheme `a_scheme', host `a_host' and path `a_path'.
 		do
 			create scheme.make_from_string (a_scheme)
-			if a_host /= Void then
-				create host.make_from_string (a_host)
-			else
-				host := Void
-			end
+			set_hostname (a_host)
 			create path.make_from_string (a_path)
 		end
 
@@ -218,14 +213,15 @@ feature -- Basic operation
 
 				-- Check path
 				-- 		TODO: no space, all character well escaped, ...
-			if path.has (' ') then
-					-- Fix bad URI
-				if a_fixing then
-					create s.make_from_string (path)
-					s.replace_substring_all (" ", "%%20")
-					set_path (s)
-					is_corrected := True
-				end
+			if
+				path.has (' ') and then
+				a_fixing
+			then
+					-- Fix bad URI.
+				create s.make_from_string (path)
+				s.replace_substring_all (" ", "%%20")
+				set_path (s)
+				is_corrected := True
 			end
 			if not is_valid_path (path) then
 				is_valid := False
@@ -233,17 +229,18 @@ feature -- Basic operation
 
 				-- Check query
 				-- 		TODO: no space, all character well escaped, ...			
-			if attached query as q then
-				if q.has (' ') then
-						-- Fix bad URI						
-					if a_fixing then
-						create s.make_from_string (q)
-						s.replace_substring_all (" ", "%%20")
-						set_query (s)
-						is_corrected := True
-					else
-						is_valid := False
-					end
+			if
+				attached query as q and then
+				q.has (' ')
+			then
+					-- Fix bad URI						
+				if a_fixing then
+					create s.make_from_string (q)
+					s.replace_substring_all (" ", "%%20")
+					set_query (s)
+					is_corrected := True
+				else
+					is_valid := False
 				end
 			end
 			if not is_valid_query (query) then
@@ -298,6 +295,49 @@ feature -- Access
 	host: detachable IMMUTABLE_STRING_8
 			-- Host name.
 			--| RFC3986: host = IP-literal / IPv4address / reg-name
+
+	idn_hostname: detachable IMMUTABLE_STRING_8
+			-- Hostname, formatted with Punycode according to the IDN standard (RFC 3490).
+			--| RFC3490 Internationalizing Domain Names in Applications (IDNA):
+			--| see https://tools.ietf.org/html/rfc3490
+		do
+			Result := host
+		end
+
+	hostname: detachable STRING_32
+			-- Unicode hostname.
+			-- Decoded IDN value from `host`.
+		note
+			EIS: "name=RFC3490 Internationalizing Domain Names in Applications (IDNA)", "protocol=URI", "src=https://tools.ietf.org/html/rfc3490"
+		local
+			lst: LIST [READABLE_STRING_8]
+			s: READABLE_STRING_8
+			l_is_first: BOOLEAN
+		do
+			if attached host as h then
+				create Result.make (h.count)
+				lst := h.split ('.')
+				l_is_first := True
+				across
+					lst as ic
+				loop
+					s := ic.item
+					if l_is_first then
+						l_is_first := False
+					else
+						Result.append_character ('.')
+					end
+					if
+						s.count > 4 and then s.head (4).is_case_insensitive_equal_general ("xn--") and then
+						attached {PUNYCODE}.decoded_string (s.substring (5, s.count)) as pc
+					then
+						Result.append_string (pc)
+					else
+						Result.append_string_general (s)
+					end
+				end
+			end
+		end
 
 	port: INTEGER
 			-- Associated port, if `0' this is not defined.
@@ -633,13 +673,13 @@ feature -- Conversion
 				end
 				p.append (c.item)
 			end
-			if p.is_empty then
-			else
-				if p.item (1) /= '/' then
-					if not path.is_empty and then path.item (1) = '/' then
-						p.prepend_character ('/')
-					end
-				end
+			if
+				not p.is_empty and then
+				p.item (1) /= '/' and then
+				not path.is_empty and then
+				path.item (1) = '/'
+			then
+				p.prepend_character ('/')
 			end
 			create Result.make_from_string (string)
 			Result.set_path (p)
@@ -673,24 +713,58 @@ feature -- Element Change
 			if v = Void then
 				userinfo := Void
 			else
-				create userinfo.make_from_string (v.as_string_8)
+				create userinfo.make_from_string (v)
 			end
 		ensure
 			userinfo_set: is_same_string (v, userinfo)
 		end
 
-	set_hostname (v: detachable READABLE_STRING_8)
-			-- Set `host' to `v'
+	set_hostname (v: detachable READABLE_STRING_GENERAL)
+			-- Set `host` from string `v` formatted with Punycode according to the IDN standard if needed.
+		note
+			EIS: "name=RFC3490 Internationalizing Domain Names in Applications (IDNA)", "protocol=URI", "src=https://tools.ietf.org/html/rfc3490"
 		require
 			is_valid_host (v)
+		local
+			pc: STRING_8
+			l_is_first: BOOLEAN
+			h: STRING_8
+			s: READABLE_STRING_GENERAL
 		do
-			if v = Void then
-				host := Void
-			else
-				create host.make_from_string (v)
+			host := Void
+			if v /= Void then
+				if v.starts_with ("xn--") and then is_ascii_string (v) then
+						-- note: if starts with xn-- and has non ASCII character ...
+						--       this is wrong, consider it as normal domain name.
+					create host.make_from_string (v.to_string_8.as_lower)
+				else
+					if is_ascii_string (v) then
+						create host.make_from_string (v.to_string_8.as_lower)
+					else
+						l_is_first := True
+						create h.make (v.count)
+						across
+							v.split ('.') as ic
+						loop
+							if l_is_first then
+								l_is_first := False
+							else
+								h.append_character ('.')
+							end
+							s := ic.item
+							if is_ascii_string (s) then
+								h.append (s.to_string_8)
+							else
+								pc := {PUNYCODE}.encoded_string (s)
+								h.append ("xn--")
+								h.append (pc)
+							end
+						end
+						check h_is_lower_case: h.same_string (h.as_lower) end
+						create host.make_from_string (h)
+					end
+				end
 			end
-		ensure
-			hostname_set: is_same_string (v, host)
 		end
 
 	set_port (v: like port)
@@ -734,13 +808,12 @@ feature -- Element Change
 					i = 0 or j > n
 				loop
 					i := a_path.index_of ('/', j)
-					if i = 1 and then a_path[i] = '/' then
+					if i = 1 and then a_path [i] = '/' then
 						j := i + 1
 							-- skipped
 					elseif i > 1 then
-						if a_path[i - 1] = '\' then
-								-- Slash being escaped ... skipped
-						else
+							-- Skip an escaped backslash.
+						if a_path [i - 1] /= '\' then
 							add_unencoded_path_segment (a_path.substring (j, i - 1))
 						end
 						j := i + 1
@@ -976,13 +1049,13 @@ feature -- Status report
 			--		reg-name    = *( unreserved / pct-encoded / sub-delims )			
 		do
 			Result := True
-			if s /= Void and then not s.is_empty then
-				if string_item (s, 1) = '[' and string_item (s, s.count) = ']' then
-					Result := True  -- IPV6 : to complete
-				else
-					Result := True -- IPV4 or reg-name : to complete
-				end
-			end
+			-- if s /= Void and then not s.is_empty then
+				-- if string_item (s, 1) = '[' and string_item (s, s.count) = ']' then
+					-- TODO: IPv6.
+				-- else
+					-- TODO: IPv4 or reg-name.
+				-- end
+			-- end
 		end
 
 	is_valid_path (s: READABLE_STRING_GENERAL): BOOLEAN
@@ -1101,6 +1174,23 @@ feature -- Status report
 			end
 		end
 
+	is_ascii_string (a_string: READABLE_STRING_GENERAL): BOOLEAN
+			-- Is `a_string` containing only ASCII characters?
+		local
+			i,n: INTEGER
+		do
+			from
+				i := 1
+				n := a_string.count
+				Result := True
+			until
+				i > n or not Result
+			loop
+				Result := a_string.code (i) <= 127 --| note: 127 = {CHARACTER_8}.max_ascii_value
+				i := i + 1
+			end
+		end
+
 feature -- Helper
 
 	string_item (s: READABLE_STRING_GENERAL; i: INTEGER): CHARACTER_32
@@ -1186,7 +1276,7 @@ feature -- Status report
 		end
 
 ;note
-	copyright: "Copyright (c) 1984-2017, Eiffel Software and others"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software and others"
 	license: "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software

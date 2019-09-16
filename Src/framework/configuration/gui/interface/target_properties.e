@@ -31,16 +31,23 @@ feature {NONE} -- Implementation
 		do
 				-- Does `current_target' extend something?
 			properties.add_section ("Information")
+
+				-- FIXME: for now, it is readonly information
+				--        it requires manual editing of the file to change!
+
 				-- Name.
 			create l_string_prop.make (conf_interface_names.target_name_name)
 			l_string_prop.set_description (conf_interface_names.target_name_description)
 			l_string_prop.set_value (current_target.name)
+			l_string_prop.enable_readonly
 			properties.add_property (l_string_prop)
 
-				-- Name.
+				-- Location.
 			create l_file_prop.make (conf_interface_names.target_location_name, current_target)
 			l_string_prop.set_description (conf_interface_names.target_location_description)
 			l_file_prop.set_value (current_target.system.file_name)
+			l_file_prop.disable_text_editing
+			l_file_prop.enable_readonly
 			properties.add_property (l_file_prop)
 
 			properties.current_section.expand
@@ -347,13 +354,24 @@ feature {NONE} -- Implementation
 				-- Optimization section.
 			properties.add_section (conf_interface_names.section_optimization)
 				-- Dead code removal.
-			l_bool_prop := new_boolean_property (conf_interface_names.target_dead_code_removal_name, current_target.setting_dead_code_removal)
-			l_bool_prop.set_description (conf_interface_names.target_dead_code_removal_description)
-			add_boolean_setting_actions (l_bool_prop, s_dead_code_removal)
-			if l_il_generation then
-				l_bool_prop.enable_readonly
+			add_choice_property
+				(locale.translation_in_context ("Dead code removal", "configuration.option.dead_code"),
+				locale.translation_in_context ("[
+					Set the kind of code removal algorithm that should be applied when compiling in finalized mode:
+						- None: do not perform dead code removal;
+						- Features only: remove code based on feature call graph;
+						- All: remove code based on feature call graph and keeping only classes used to create objects or marked as visible.
+				]", "configuration.option.dead_code"),
+				create {ARRAYED_LIST [STRING_32]}.make_from_array
+					(<<
+						locale.translation_in_context ("None", "configuration.option.dead_code"),
+						locale.translation_in_context ("Features only", "configuration.option.dead_code"),
+						locale.translation_in_context ("All", "configuration.option.dead_code")
+					>>),
+				current_target.changeable_internal_options.dead_code, if l_extends then current_target.options.dead_code else Void end)
+			if attached last_added_choice_property as l_prop and then l_il_generation then
+				l_prop.enable_readonly
 			end
-			properties.add_property (l_bool_prop)
 				-- Inlining.
 			l_bool_prop := new_boolean_property (conf_interface_names.target_inlining_name, current_target.setting_inlining)
 			l_bool_prop.set_description (conf_interface_names.target_inlining_description)
@@ -576,7 +594,7 @@ feature {NONE} -- Implementation helper
 		do
 			a_property.set_refresh_action (agent current_target.setting_boolean (a_name))
 			a_property.refresh
-			a_property.change_value_actions.extend (agent set_boolean_setting (a_name, true_boolean_settings.has (a_name), ?))
+			a_property.change_value_actions.extend (agent set_boolean_setting (a_name, is_boolean_setting_true (a_name, current_target.system.namespace), ?))
 			a_property.change_value_actions.extend (agent change_no_argument_boolean_wrapper (?, agent update_inheritance_setting (a_name, a_property)))
 			a_property.change_value_actions.extend (agent change_no_argument_boolean_wrapper (?, agent handle_value_changes (False)))
 			a_property.use_inherited_actions.extend (agent current_target.update_setting (a_name, Void))
@@ -706,7 +724,7 @@ feature {NONE} -- Validation and warning generation
 			l_targets: STRING_TABLE [CONF_TARGET]
 		do
 			l_targets := conf_system.targets
-			l_targets.search (a_name.as_lower)
+			l_targets.search (a_name)
 			if not (create {EIFFEL_SYNTAX_CHECKER}).is_valid_target_name (a_name) then
 				prompts.show_error_prompt (conf_interface_names.target_name_invalid, window, Void)
 			elseif l_targets.found and then l_targets.found_item /= current_target then
@@ -743,7 +761,7 @@ feature {NONE} -- Validation and warning generation
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

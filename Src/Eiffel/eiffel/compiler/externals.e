@@ -1,8 +1,8 @@
 ﻿note
 	description: "[
-		List of all C external features in IL code generation.
-		For each class ID we have a SEARCH_TABLE [INTEGER] that
-		represents all external names ID in class ID.
+			List of all C external features in IL code generation.
+			For each class ID we have a SEARCH_TABLE [INTEGER] that
+			represents all external names ID in class ID.
 		]"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
@@ -16,7 +16,7 @@ inherit
 	HASH_TABLE [SEARCH_TABLE [INTEGER], INTEGER]
 		export
 			{EXTERNALS} all
-			{ANY} has, remove, count, valid_key
+			{ANY} count, has, prunable, remove
 		end
 
 	SHARED_WORKBENCH
@@ -64,7 +64,6 @@ feature -- Insertion/Removal
 		require
 			ext_not_void: ext /= Void
 			is_c_external: ext.is_c_external
-			valid_key: valid_key (ext.written_in)
 		local
 			l_s: SEARCH_TABLE [INTEGER]
 		do
@@ -83,15 +82,11 @@ feature -- Insertion/Removal
 		require
 			ext_not_void: ext /= Void
 			is_c_external: ext.is_c_external
-			valid_key: valid_key (ext.written_in)
 			has_entry: has (ext.written_in)
 		local
 			l_s: SEARCH_TABLE [INTEGER]
 		do
-			l_s := item (ext.written_in)
-			check
-				l_s_not_void: l_s /= Void
-			end
+			l_s := definite_item (ext.written_in)
 			l_s.remove (ext.feature_name_id)
 			if l_s.is_empty then
 				remove (ext.written_in)
@@ -196,7 +191,6 @@ feature {NONE} -- Implementation
 			l_extension: STRING
 			l_file_name: STRING
 			l_class: CLASS_C
-			l_types: TYPE_LIST
 		do
 			from
 				final_mode := context.final_mode
@@ -235,14 +229,10 @@ feature {NONE} -- Implementation
 			loop
 				l_class := System.class_of_id (key_for_iteration)
 				if l_class.has_types then
-					from
-						l_types := l_class.types
-						l_types.start
-					until
-						l_types.after
+					across
+						l_class.types as t
 					loop
-						generate_class_il (item_for_iteration, l_class, l_types.item, a_for_cpp, buffer, header_buffer)
-						l_types.forth
+						generate_class_il (item_for_iteration, l_class, t.item, a_for_cpp, buffer, header_buffer)
 					end
 					buffer.put_new_line
 				end
@@ -328,7 +318,7 @@ feature {NONE} -- Previous version
 			-- Old version of Current.
 
 note
-	copyright:	"Copyright (c) 1984-2016, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

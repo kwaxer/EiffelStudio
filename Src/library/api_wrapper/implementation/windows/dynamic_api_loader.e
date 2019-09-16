@@ -1,10 +1,10 @@
-note
+﻿note
 	description: "[
 		The Windows implementation of the dynamic API loader {DYNAMIC_API_I}.
 	]"
 	legal: "See notice at end of class."
-	status: "See notice at end of class.";
-	date: "$Date$";
+	status: "See notice at end of class."
+	date: "$Date$"
 	revision: "$Revision$"
 
 class
@@ -31,24 +31,20 @@ feature -- Query
 
 feature -- Basic operations
 
-	load_library (a_name: READABLE_STRING_8; a_version: detachable READABLE_STRING_8): POINTER
+	load_library (a_name: READABLE_STRING_GENERAL; a_version: detachable READABLE_STRING_GENERAL): POINTER
 			-- <Precursor>
 		local
-			l_fn: FILE_NAME
-			l_dll_fn: FILE_NAME
+			l_fn: PATH
+			l_dll_fn: PATH
 		do
-			if a_version = Void then
-				create l_fn.make_from_string (a_name.as_string_8)
-			else
-				create l_fn.make_from_string (a_name.as_string_8 + a_version.as_string_8)
-			end
+			create l_fn.make_from_string (if a_version = Void then a_name else a_name + a_version end)
 			l_dll_fn := l_fn.twin
-			l_dll_fn.add_extension (once "dll")
-			Result := load_library_from_path (l_dll_fn.string)
+			l_dll_fn := l_dll_fn.appended_with_extension (once "dll")
+			Result := load_library_from_path (l_dll_fn.utf_8_name)
 			if Result = default_pointer then
 					-- No DLL found, attempt EXE
-				l_fn.add_extension (once "exe")
-				Result := load_library_from_path (l_fn.string)
+				l_fn := l_fn.appended_with_extension (once "exe")
+				Result := load_library_from_path (l_fn.utf_8_name)
 				if Result = default_pointer and a_version /= Void then
 						-- Use an unversioned library, because Windows libraries typically do not
 						-- have a version number.
@@ -57,7 +53,7 @@ feature -- Basic operations
 			end
 		end
 
-	load_library_from_path (a_path: READABLE_STRING_8): POINTER
+	load_library_from_path (a_path: READABLE_STRING_GENERAL): POINTER
 			-- <Precursor>
 		local
 			l_path: C_STRING
@@ -72,8 +68,8 @@ feature -- Basic operations
 			l_result: BOOLEAN
 		do
 			l_result := c_free_library (a_hnd)
-			check 
-				library_freed: l_result 
+			check
+				library_freed: l_result
 			end
 		end
 
@@ -123,8 +119,8 @@ feature {NONE} -- Externals
 		end
 
 ;note
-	copyright:	"Copyright (c) 1984-2009, Eiffel Software"
-	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software and others"
+	license:	"Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[
 			This file is part of Eiffel Software's Eiffel Development Environment.

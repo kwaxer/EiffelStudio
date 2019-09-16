@@ -1,7 +1,8 @@
 <!doctype html>
 <html>
 <head>
-	<meta charset="utf-8">
+	<meta charset="utf-8"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1"/>
 	<title>{if isset="$site_title"}{$site_title/}{/if}</title>
 <link media="all" rel="stylesheet" href="{$theme_path/}css/all.css" />
 <link rel="shortcut icon" href="{$site_url/}favicon.ico"/>
@@ -12,7 +13,8 @@
 {if isset="$head"}{$head/}{/if}
 {if isset="$styles"}{$styles/}{/if}
 
-	<script type="text/javascript" src="{$theme_path/}js/jquery-1.8.3.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script> 
+
 {if isset="$scripts"}{$scripts/}{/if}
 {if isset="$head_lines"}{$head_lines/}{/if}
 </head>
@@ -37,8 +39,6 @@
 <!-- Footer -->
 {include file="footer.tpl"/}
 
-	<script type="text/javascript" src="{$theme_path/}js/jquery-1.8.3.min.js"></script>
-	<script type="text/javascript" src="{$theme_path/}js/jquery.main.js"></script>
 	<script type="text/javascript" src="{$theme_path/}js/wdownloads.js"></script>
 	<script type="text/javascript" src="{$theme_path/}js/home.js"></script>
 

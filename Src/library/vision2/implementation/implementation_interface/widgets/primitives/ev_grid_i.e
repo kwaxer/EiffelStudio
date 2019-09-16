@@ -19,8 +19,6 @@ inherit
 			interface,
 			drop_actions,
 			set_default_key_processing_handler,
-			has_focus,
-			set_focus,
 			set_pebble,
 			set_pebble_function,
 			conforming_pick_actions,
@@ -28,9 +26,6 @@ inherit
 			pick_ended_actions,
 			set_accept_cursor,
 			set_deny_cursor,
-			enable_capture,
-			disable_capture,
-			has_capture,
 			set_pick_and_drop_mode,
 			set_drag_and_drop_mode,
 			set_target_menu_mode,
@@ -2698,8 +2693,7 @@ feature -- Removal
 
 				-- Remove association of column with `Current'
 			a_col_i.update_for_removal
-			columns.go_i_th (a_column)
-			columns.remove
+			columns.remove_i_th (a_column)
 
 			update_grid_column_indices (a_column)
 			update_index_of_first_item_dirty_row_flags (a_column)
@@ -4324,6 +4318,7 @@ feature {EV_GRID_LOCKED_I} -- Drawing implementation
 			vertical_box.extend (header_viewport)
 			vertical_box.disable_item_expand (header_viewport)
 			viewport.resize_actions.extend (agent viewport_resized)
+			viewport.dpi_changed_actions.extend (agent viewport_dpi_change_resized)
 
 			static_fixed.set_minimum_size (static_fixed_x_offset * 2, static_fixed_y_offset * 2)
 
@@ -4857,6 +4852,15 @@ feature {EV_GRID_LOCKED_I} -- Drawing implementation
 			viewable_dimensions_set: viewable_width = a_width and viewable_height = a_height
 			viewport_item_at_least_as_big_as_viewport: viewport.readable implies (viewport.item.width >= viewable_width and
 				viewport.item.height >= viewable_height)
+		end
+
+	viewport_dpi_change_resized (a_dpi,an_x, a_y, a_width, a_height: INTEGER)
+			-- Respond to resizing of `Viewport' to width and height `a_width', `a_height'.
+		require
+			a_width_non_negative: a_width >= 0
+			a_height_non_negative: a_height >= 0
+		do
+			viewport_resized (an_x, a_y, a_width, a_height)
 		end
 
 	reposition_locked_items
@@ -6754,7 +6758,7 @@ invariant
 	tree_node_connector_color_not_void: is_initialized implies tree_node_connector_color /= Void
 
 note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software and others"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software and others"
 	license:	"Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software

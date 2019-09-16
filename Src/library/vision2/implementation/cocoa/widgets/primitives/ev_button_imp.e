@@ -1,6 +1,5 @@
-note
-	description:
-		"Eiffel Vision button. Cocoa implementation."
+﻿note
+	description: "Eiffel Vision button. Cocoa implementation."
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
 	keywords: "press, push, label, pixmap"
@@ -33,14 +32,12 @@ inherit
 	EV_PIXMAPABLE_IMP
 		redefine
 			interface,
-			make,
 			set_pixmap
 		end
 
 	EV_TEXTABLE_IMP
 		redefine
 			interface,
-			make,
 			set_text,
 			align_text_left,
 			align_text_center,
@@ -49,8 +46,7 @@ inherit
 
 	EV_FONTABLE_IMP
 		redefine
-			interface,
-			make
+			interface
 		end
 
 	NS_BUTTON
@@ -159,7 +155,7 @@ feature -- Status Setting
 					accommodate_text (a_text)
 				end
 				Precursor {EV_TEXTABLE_IMP} (a_text)
-				set_title (a_text.as_string_8)
+				set_title (a_text)
 			end
 		end
 
@@ -191,12 +187,9 @@ feature -- Measurement
 			a_text_not_empty: not a_text.is_empty
 		local
 			t: TUPLE [width: INTEGER; height: INTEGER]
-			a_width, a_height: INTEGER
 		do
 			t := font.string_size (a_text)
-			a_width := t.width
-			a_height := t.height
-			internal_set_minimum_size (a_width.abs + 30, a_height.abs + 10)
+			internal_set_minimum_size (t.width.abs + 30, t.height.abs + 10)
 		end
 
 feature -- Sensitivity
@@ -245,10 +238,10 @@ feature {NONE} -- implementation
 
 	set_pixmap (a_pixmap: EV_PIXMAP)
 		do
-			if attached {EV_PIXMAP_IMP} a_pixmap.implementation as pixmap_imp then
---				set_bezel_style ({NS_BUTTON}.rectangular_square_bezel_style)
---				set_image (pixmap_imp.image)
-			end
+--			if attached {EV_PIXMAP_IMP} a_pixmap.implementation as pixmap_imp then
+----				set_bezel_style ({NS_BUTTON}.rectangular_square_bezel_style)
+----				set_image (pixmap_imp.image)
+--			end
 		end
 
 feature {EV_ANY, EV_ANY_I} -- implementation
@@ -264,7 +257,7 @@ feature {EV_ANY, EV_ANY_I} -- implementation
 			-- functionality implemented by `Current'
 
 note
-	copyright: "Copyright (c) 1984-2014, Eiffel Software and others"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software and others"
 	license: "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software
@@ -273,4 +266,5 @@ note
 			Website http://www.eiffel.com
 			Customer support http://support.eiffel.com
 		]"
-end -- class EV_BUTTON_IMP
+
+end

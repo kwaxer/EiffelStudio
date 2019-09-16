@@ -59,7 +59,7 @@ feature -- Basic Operations
 				io.error.put_character (' ')
 				localized_print_error (a_err.description)
 			end
-			io.new_line
+			io.error.put_new_line
 		end
 
 feature {NONE} -- Output
@@ -73,7 +73,6 @@ feature {NONE} -- Output
 			l_ln: INTEGER
 			l_cwd: STRING_32
 			l_name: detachable STRING_32
-			utf: UTF_CONVERTER
 		do
 			l_ln := -1
 			if attached {ERROR_FILE_ERROR_INFO} a_error as l_file_error then
@@ -112,7 +111,7 @@ feature {NONE} -- Output
 			end
 
 			if l_name /= Void and then not l_name.is_empty then
-				io.error.put_string (utf.string_32_to_utf_8_string_8 (l_name)) -- FIXME: use localized_printer.
+				localized_print_error (l_name)
 			else
 				check
 					l_name_attached: l_name /= Void
@@ -164,7 +163,7 @@ feature {NONE} -- Implementation
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

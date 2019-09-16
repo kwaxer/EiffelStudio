@@ -5,7 +5,7 @@ note
 		"Eiffel class types"
 
 	library: "Gobo Eiffel Tools Library"
-	copyright:  "Copyright (c) 1999-2017, Eric Bezault and others"
+	copyright:  "Copyright (c) 1999-2019, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -24,6 +24,7 @@ inherit
 			conforms_from_class_type_with_type_marks,
 			resolved_formal_parameters_with_type_mark,
 			append_unaliased_to_string,
+			append_runtime_name_to_string,
 			type_with_type_mark,
 			type_mark,
 			overridden_type_mark,
@@ -343,9 +344,6 @@ feature -- Status report
 		do
 			if is_expanded then
 				Result := True
-			elseif base_class.is_none then
-					-- Class type "NONE" is always detachable regardless of type marks.
-				Result := False
 			elseif attached type_mark as l_type_mark and then l_type_mark.is_attachment_mark then
 				Result := l_type_mark.is_attached_mark
 			else
@@ -357,10 +355,7 @@ feature -- Status report
 			-- Same as `is_type_attached' except that the type mark status is
 			-- overridden by `a_type_mark', if not Void
 		do
-			if base_class.is_none then
-					-- Class type "NONE" is always detachable regardless of type marks.
-				Result := False
-			elseif a_type_mark = Void then
+			if a_type_mark = Void then
 				Result := is_attached
 			elseif a_type_mark.is_attached_mark then
 				Result := True
@@ -435,7 +430,7 @@ feature -- Comparison
 
 	same_as_base_class: BOOLEAN
 			-- Is current type a non-generic class type with the same
-			-- expandedness and separateness status as its base class,
+			-- expandedness, attachment and separateness status as its base class,
 			-- or is it its own base class?
 		do
 			if base_class.is_unknown then
@@ -446,7 +441,8 @@ feature -- Comparison
 			else
 				Result := not is_generic and then
 					(is_expanded = base_class.is_expanded and
-					is_separate = base_class.is_separate)
+					is_separate = base_class.is_separate) and
+					(base_class.current_system.attachment_type_conformance_mode implies is_attached = base_class.is_attached)
 			end
 		end
 
@@ -549,7 +545,7 @@ feature {ET_TYPE, ET_TYPE_CONTEXT} -- Comparison
 
 feature -- Conformance
 
-	conforms_to_type_with_type_marks (other: ET_TYPE; other_type_mark: detachable ET_TYPE_MARK; other_context: ET_TYPE_CONTEXT; a_type_mark: detachable ET_TYPE_MARK; a_context: ET_TYPE_CONTEXT): BOOLEAN
+	conforms_to_type_with_type_marks (other: ET_TYPE; other_type_mark: detachable ET_TYPE_MARK; other_context: ET_TYPE_CONTEXT; a_type_mark: detachable ET_TYPE_MARK; a_context: ET_TYPE_CONTEXT; a_system_processor: ET_SYSTEM_PROCESSOR): BOOLEAN
 			-- Same as `conforms_to_type' except that the type mark status of `Current'
 			-- and `other' is overridden by `a_type_mark' and `other_type_mark', if not Void
 		do
@@ -559,18 +555,18 @@ feature -- Conformance
 			elseif other = Current and then other_type_mark = a_type_mark and then (other_context = a_context or else not is_generic) then
 				Result := True
 			else
-				Result := other.conforms_from_class_type_with_type_marks (Current, a_type_mark, a_context, other_type_mark, other_context)
+				Result := other.conforms_from_class_type_with_type_marks (Current, a_type_mark, a_context, other_type_mark, other_context, a_system_processor)
 			end
 		end
 
 feature {ET_TYPE, ET_TYPE_CONTEXT} -- Conformance
 
-	conforms_from_class_type_with_type_marks (other: ET_CLASS_TYPE; other_type_mark: detachable ET_TYPE_MARK; other_context: ET_TYPE_CONTEXT; a_type_mark: detachable ET_TYPE_MARK; a_context: ET_TYPE_CONTEXT): BOOLEAN
+	conforms_from_class_type_with_type_marks (other: ET_CLASS_TYPE; other_type_mark: detachable ET_TYPE_MARK; other_context: ET_TYPE_CONTEXT; a_type_mark: detachable ET_TYPE_MARK; a_context: ET_TYPE_CONTEXT; a_system_processor: ET_SYSTEM_PROCESSOR): BOOLEAN
 			-- Does `other' type appearing in `other_context' conform
 			-- to current type appearing in `a_context'?
 			-- Note that the type mark status of `Current' and `other' is
 			-- overridden by `a_type_mark' and `other_type_mark', if not Void
-			-- (Note: 'current_system.ancestor_builder' is used on the classes
+			-- (Note: 'a_system_processor.ancestor_builder' is used on the classes
 			-- whose ancestors need to be built in order to check for conformance.)
 		local
 			other_base_class: ET_CLASS
@@ -612,23 +608,27 @@ feature {ET_TYPE, ET_TYPE_CONTEXT} -- Conformance
 --					then
 --						-- Use SmartEiffel agent type conformance semantics, where the conformance
 --						-- of the second actual generic parameter is checked in the reverse order.
---						Result := l_other_actual_parameters.agent_conforms_to_types (2, l_actual_parameters, a_context, other_context)
+--						Result := l_other_actual_parameters.agent_conforms_to_types (2, l_actual_parameters, a_context, other_context, a_system_processor)
 --					else
-						Result := l_other_actual_parameters.conforms_to_types (l_actual_parameters, a_context, other_context)
+						Result := l_other_actual_parameters.conforms_to_types (l_actual_parameters, a_context, other_context, a_system_processor)
 --					end
 				end
 			elseif not is_type_expanded_with_type_mark (a_type_mark, a_context) then
 				if other_base_class.is_none then
-						-- Class type "NONE" is always detachable regardless of type marks.
-						-- Therefore it conforms to any class type that is not expanded nor attached.
-					Result := True
+						-- Class type "detachable NONE" conforms to any class type that is not expanded nor attached.
+						-- Class type "attached NONE" conforms to any attached class type that is not expanded.
+					if other_context.attachment_type_conformance_mode then
+						Result := is_type_attached_with_type_mark (a_type_mark, a_context) implies other.is_type_attached_with_type_mark (other_type_mark, other_context)
+					else
+						Result := True
+					end
 				elseif not other_base_class.is_preparsed then
 						-- This class is not even preparsed (i.e. we know nothing about it,
 						-- not even its filename). Therefore it is impossible to determine
 						-- whether it conforms to current type.
 					Result := False
 				else
-					other_base_class.process (other_base_class.current_system.ancestor_builder)
+					other_base_class.process (a_system_processor.ancestor_builder)
 						-- If there was an error building the ancestors of
 						-- `other_base_class', this error has already been
 						-- reported, so we assume here that everything went
@@ -645,7 +645,7 @@ feature {ET_TYPE, ET_TYPE_CONTEXT} -- Conformance
 							l_other_type_mark := tokens.implicit_attached_type_mark
 						end
 						if not l_ancestor.is_generic then
-							Result := l_ancestor.conforms_to_type_with_type_marks (Current, a_type_mark, a_context, l_other_type_mark, other_context)
+							Result := l_ancestor.conforms_to_type_with_type_marks (Current, a_type_mark, a_context, l_other_type_mark, other_context, a_system_processor)
 						else
 							if other_context /= a_context then
 								l_ancestor_context := other_context.as_nested_type_context
@@ -653,7 +653,7 @@ feature {ET_TYPE, ET_TYPE_CONTEXT} -- Conformance
 								l_ancestor_context := other_context.to_nested_type_context
 							end
 							l_ancestor_context.force_last (other)
-							Result := l_ancestor.conforms_to_type_with_type_marks (Current, a_type_mark, a_context, l_other_type_mark, l_ancestor_context)
+							Result := l_ancestor.conforms_to_type_with_type_marks (Current, a_type_mark, a_context, l_other_type_mark, l_ancestor_context, a_system_processor)
 							l_ancestor_context.remove_last
 						end
 					elseif base_class.is_system_object_class and then base_class.is_dotnet then
@@ -747,7 +747,7 @@ feature -- Type processing
 			end
 		end
 
-	resolve_unfolded_tuple_actual_parameters_2 (a_context, a_constraint_context: ET_TYPE_CONTEXT)
+	resolve_unfolded_tuple_actual_parameters_2 (a_context, a_constraint_context: ET_TYPE_CONTEXT; a_system_processor: ET_SYSTEM_PROCESSOR)
 			-- Second phase of Tuple-type-unfolding in actual parameters of current class type.
 			-- Perform transformations which require conformance checking:
 			-- * Resolve the case: "FOO [A, B, C]" -> "FOO [A, TUPLE [B], C]".
@@ -760,6 +760,7 @@ feature -- Type processing
 			a_contrainst_context_not_void: a_constraint_context /= Void
 			single_tuple_class: base_class.tuple_constraint_position /= 0
 			same_parameter_count: base_class.formal_parameter_count = actual_parameter_count
+			a_system_processor_not_void: a_system_processor /= Void
 		local
 			l_base_class: ET_CLASS
 			l_unfolded_tuple_actuals: ET_UNFOLDED_TUPLE_ACTUAL_PARAMETERS
@@ -780,7 +781,7 @@ feature -- Type processing
 				elseif attached actual_parameters as l_actual_parameters then
 					if attached l_formal_parameters.formal_parameter (l_tuple_constraint_position).constraint as l_tuple_constraint then
 						l_actual := l_actual_parameters.type (l_tuple_constraint_position)
-						if not l_actual.conforms_to_type (l_tuple_constraint, a_constraint_context, a_context) then
+						if not l_actual.conforms_to_constraint (l_tuple_constraint, a_constraint_context, a_context, a_system_processor) then
 							create l_actual_sublist.make (l_actual_parameters, l_tuple_constraint_position, l_tuple_constraint_position)
 							create l_tuple_type.make (tokens.implicit_attached_type_mark, l_actual_sublist, a_context.root_context.base_class.universe.tuple_type.named_base_class)
 							create l_tuple_keyword.make (tokens.tuple_keyword.name)
@@ -828,14 +829,7 @@ feature -- Output
 			-- current type to `a_string'.
 		do
 			if attached type_mark as l_type_mark then
-				if l_type_mark.is_implicit_mark then
-					a_string.append_character ('[')
-				end
-				a_string.append_string (l_type_mark.text)
-				if l_type_mark.is_implicit_mark then
-					a_string.append_character (']')
-				end
-				a_string.append_character (' ')
+				l_type_mark.append_to_string_with_space (a_string)
 			end
 			a_string.append_string (name.upper_name)
 			if attached actual_parameters as l_parameters and then not l_parameters.is_empty then
@@ -851,20 +845,34 @@ feature -- Output
 			-- are replaced by the associated types such as INTEGER_32.
 		do
 			if attached type_mark as l_type_mark then
-				if l_type_mark.is_implicit_mark then
-					a_string.append_character ('[')
-				end
-				a_string.append_string (l_type_mark.text)
-				if l_type_mark.is_implicit_mark then
-					a_string.append_character (']')
-				end
-				a_string.append_character (' ')
+				l_type_mark.append_to_string_with_space (a_string)
 			end
 			a_string.append_string (base_class.upper_name)
-
 			if attached actual_parameters as l_parameters and then not l_parameters.is_empty then
 				a_string.append_character (' ')
 				l_parameters.append_unaliased_to_string (a_string)
+			end
+		end
+
+	append_runtime_name_to_string (a_string: STRING)
+			-- Append to `a_string' textual representation of unaliased
+			-- version of current type as returned by 'TYPE.runtime_name'.
+			-- An unaliased version if when aliased types such as INTEGER
+			-- are replaced by the associated types such as INTEGER_32.
+		local
+			l_base_class: ET_CLASS
+		do
+			l_base_class := base_class
+			if l_base_class.current_system.attachment_type_conformance_mode then
+					-- Void-safe mode.
+				if is_attached and then not is_expanded then
+					a_string.append_character ('!')
+				end
+			end
+			a_string.append_string (base_class.upper_name)
+			if attached actual_parameters as l_parameters and then not l_parameters.is_empty then
+				a_string.append_character (' ')
+				l_parameters.append_runtime_name_to_string (a_string)
 			end
 		end
 

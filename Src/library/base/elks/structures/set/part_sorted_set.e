@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "[
 		Sets whose items may be compared according to a partial order relation
 		implemented as sorted two-way lists.
@@ -6,10 +6,10 @@ note
 	library: "Free implementation of ELKS library"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
-	names: sorted_set, set, two_way_list;
-	representation: linked;
-	access: membership, min, max;
-	contents: generic;
+	names: sorted_set, set, two_way_list
+	representation: linked
+	access: membership, min, max
+	contents: generic
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -27,6 +27,7 @@ class PART_SORTED_SET [G -> PART_COMPARABLE] inherit
 	PART_SORTED_TWO_WAY_LIST [G]
 		rename
 			extend as pstwl_extend,
+			has as has alias "∋",
 			prune as pstwl_prune,
 			put as pstwl_put,
 			merge as pstwl_merge
@@ -37,14 +38,29 @@ class PART_SORTED_SET [G -> PART_COMPARABLE] inherit
 			{PART_SORTED_SET} cursor, go_to, first_element, last_element, valid_cursor
 			{NONE} all
 		redefine
-			duplicate
+			duplicate,
+			make_from_iterable
 		end
 
 create
-	make
+	make,
+	make_from_iterable
 
 create {PART_SORTED_SET}
 	make_sublist
+
+feature {NONE} -- Creation
+
+	make_from_iterable (other: ITERABLE [G])
+			-- Create a set with all items obtained from `other`.
+		do
+			make
+			across
+				other as o
+			loop
+				extend (o.item)
+			end
+		end
 
 feature -- Element change
 
@@ -108,6 +124,12 @@ feature -- Duplication
 	duplicate (n: INTEGER): like Current
 			-- Copy of sub-set beginning at cursor position
 			-- and having min (`n', `count' - `index' + 1) items
+		obsolete
+			"[
+				Create a new container explicitly using `make_from_iterable` if available.
+				Otherwise, replace a call to the feature with code that creates and initializes container.
+				[2018-11-30]
+			]"
 		local
 			pos: CURSOR
 			counter: INTEGER
@@ -127,7 +149,7 @@ feature -- Duplication
 		end
 
 note
-	copyright: "Copyright (c) 1984-2012, Eiffel Software and others"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software and others"
 	license:   "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software

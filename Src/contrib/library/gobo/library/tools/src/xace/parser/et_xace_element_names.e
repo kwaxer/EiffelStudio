@@ -5,12 +5,16 @@ note
 		"Xace XML element names"
 
 	library: "Gobo Eiffel Tools Library"
-	copyright: "Copyright (c) 2001-2002, Andreas Leitner and others"
+	copyright: "Copyright (c) 2001-2019, Andreas Leitner and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
 
 class ET_XACE_ELEMENT_NAMES
+
+obsolete
+
+	"Use ET_ECF_* classes instead. [2019-03-17]"
 
 feature -- Constants
 
@@ -300,6 +304,15 @@ feature -- Constants
 		ensure
 			uc_unless_not_void: Result /= Void
 			uc_unless_not_empty: Result.count > 0
+		end
+
+	uc_target: STRING
+			-- "target" element name
+		once
+			Result := "target"
+		ensure
+			uc_target_not_void: Result /= Void
+			uc_target_not_empty: Result.count > 0
 		end
 
 end

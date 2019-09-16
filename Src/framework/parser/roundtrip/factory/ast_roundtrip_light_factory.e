@@ -1,15 +1,14 @@
-note
+﻿note
 	description: "[
-					AST factory that supports roundtrip facility
-					This factory will setup all indexes used by roundtrip parser,
-					but it doesn't generate `match_list'.
+			AST factory that supports roundtrip facility
+			This factory will setup all indexes used by roundtrip parser,
+			but it doesn't generate `match_list'.
 
-					Use `AST_ROUNDTRIP_FACTORY' if you want to generate `match_list' while parsing or
-					you can use `EIFFEL_ROUNDTRIP_SCANNER' later to generate `match_list' separately.
-				 ]"
+			Use `AST_ROUNDTRIP_FACTORY' if you want to generate `match_list' while parsing or
+			you can use `EIFFEL_ROUNDTRIP_SCANNER' later to generate `match_list' separately.
+		]"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
-	author: ""
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -25,6 +24,7 @@ inherit
 			new_keyword_as,
 			new_keyword_id_as,
 			new_symbol_as,
+			new_symbol_id_as,
 			new_current_as,
 			new_deferred_as,
 			new_boolean_as,
@@ -160,7 +160,7 @@ feature -- Leaf nodes
 			Result.set_index (match_list_count)
 		end
 
-	new_integer_as (t: detachable TYPE_AS; s: BOOLEAN; v: detachable STRING; buf: detachable STRING; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
+	new_integer_as (t: detachable TYPE_AS; s: BOOLEAN; v: detachable STRING; buf: detachable READABLE_STRING_8; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
 			-- New INTEGER_AS node
 		do
 			if v /= Void then
@@ -172,7 +172,7 @@ feature -- Leaf nodes
 			end
 		end
 
-	new_integer_hexa_as (t: detachable TYPE_AS; s: CHARACTER; v: detachable STRING; buf: STRING; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
+	new_integer_hexa_as (t: detachable TYPE_AS; s: CHARACTER; v: detachable STRING; buf: READABLE_STRING_8; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
 			-- New INTEGER_AS node
 		do
 			if v /= Void then
@@ -184,7 +184,7 @@ feature -- Leaf nodes
 			end
 		end
 
-	new_integer_octal_as (t: detachable TYPE_AS; s: CHARACTER; v: detachable STRING; buf: STRING; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
+	new_integer_octal_as (t: detachable TYPE_AS; s: CHARACTER; v: detachable STRING; buf: READABLE_STRING_8; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
 			-- New INTEGER_AS node
 		do
 			if v /= Void then
@@ -196,7 +196,7 @@ feature -- Leaf nodes
 			end
 		end
 
-	new_integer_binary_as (t: detachable TYPE_AS; s: CHARACTER; v: detachable STRING; buf: STRING; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
+	new_integer_binary_as (t: detachable TYPE_AS; s: CHARACTER; v: detachable STRING; buf: READABLE_STRING_8; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
 			-- New INTEGER_AS node
 		do
 			if v /= Void then
@@ -208,7 +208,7 @@ feature -- Leaf nodes
 			end
 		end
 
-	new_real_as (t: detachable TYPE_AS; v: detachable STRING; buf: STRING; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable REAL_AS
+	new_real_as (t: detachable TYPE_AS; v: detachable READABLE_STRING_8; buf: READABLE_STRING_8; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable REAL_AS
 			-- New REAL AST node
 		do
 			if v /= Void then
@@ -352,6 +352,34 @@ feature -- Leaf nodes
 			Result.set_index (match_list_count)
 		end
 
+	new_symbol_id_as (c: INTEGER_32; s: EIFFEL_SCANNER_SKELETON): detachable like symbol_id_type
+			-- <Precursor>
+		local
+			l_id_as: ID_AS
+			l_symbol_as: SYMBOL_AS
+			l_cnt: INTEGER_32
+			l_str: STRING_8
+		do
+				-- Create the ID_AS first.
+			l_cnt := s.text_count
+			l_str := reusable_string_buffer
+			l_str.wipe_out
+			s.append_text_to_string (l_str)
+			create l_id_as.initialize (l_str)
+			l_id_as.set_position (s.line, s.column, s.position, l_cnt,
+				s.character_column, s.character_position, s.unicode_text_count)
+
+				-- Create the SYMBOL_AS
+			create l_symbol_as.make (c, s.line, s.column, s.position, s.text_count, s.character_column, s.character_position, s.unicode_text_count)
+
+				-- Since the keyword is sharing the same piece of text as the ID_AS, we share the index.
+			increase_match_list_count
+			l_id_as.set_index (match_list_count)
+			l_symbol_as.set_index (match_list_count)
+
+			Result := [l_symbol_as, l_id_as, s.line, s.column, s.filename]
+		end
+
 	create_break_as (a_scn: EIFFEL_SCANNER_SKELETON)
 			-- NEw BREAK_AS node
 		do
@@ -366,12 +394,12 @@ feature -- Leaf nodes
 
 feature -- Access
 
-	new_integer_value (a_psr: EIFFEL_SCANNER_SKELETON; sign_symbol: CHARACTER; a_type: detachable TYPE_AS; buffer: STRING; s_as: detachable SYMBOL_AS): detachable INTEGER_AS
+	new_integer_value (a_psr: EIFFEL_SCANNER_SKELETON; sign_symbol: CHARACTER; a_type: detachable TYPE_AS; buffer: READABLE_STRING_8; s_as: detachable SYMBOL_AS): detachable INTEGER_AS
 		local
 			token_value: STRING
 		do
 				-- Remember original token
-			token_value := buffer.twin
+			create token_value.make_from_string (buffer)
 				-- Remove underscores (if any) without breaking
 				-- original token
 			if token_value.has ('_') then
@@ -391,17 +419,16 @@ feature -- Access
 			end
 		end
 
-	new_real_value (a_psr: EIFFEL_SCANNER_SKELETON; is_signed: BOOLEAN; sign_symbol: CHARACTER; a_type: detachable TYPE_AS; buffer: STRING; s_as: detachable SYMBOL_AS): detachable REAL_AS
+	new_real_value (a_psr: EIFFEL_SCANNER_SKELETON; is_signed: BOOLEAN; sign_symbol: CHARACTER; a_type: detachable TYPE_AS; buffer: READABLE_STRING_8; s_as: detachable SYMBOL_AS): detachable REAL_AS
 		local
-			l_buffer: STRING
+			l_buffer: READABLE_STRING_8
 		do
 			if is_signed and sign_symbol = '-' then
-				l_buffer := buffer.twin
-				buffer.precede ('-')
+				l_buffer := "-" + buffer
 			else
 				l_buffer := buffer
 			end
-			Result := new_real_as (a_type, buffer, a_psr.text, s_as, a_psr.line, a_psr.column, a_psr.position, a_psr.text_count,
+			Result := new_real_as (a_type, l_buffer, a_psr.text, s_as, a_psr.line, a_psr.column, a_psr.position, a_psr.text_count,
 				a_psr.character_column, a_psr.character_position, a_psr.unicode_text_count)
 		end
 
@@ -422,7 +449,8 @@ feature -- Access
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2015, Eiffel Software"
+	ca_ignore: "CA011", "CA011: too many arguments"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

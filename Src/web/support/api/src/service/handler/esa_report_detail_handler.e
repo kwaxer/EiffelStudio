@@ -68,12 +68,16 @@ feature -- HTTP Methods
 			if attached current_user_name (req) as l_user then
 					-- Logged in user
 					-- Report, Interactions, Attachments
-				log.write_information (generator + ".do_get Processing request user_report_details ")
+				debug
+					log.write_information (generator + ".do_get Processing request user_report_details ")
+				end
 				user_report_details (req, res, l_user)
 			else
 					-- Guest user
 					-- Report, Interactions, Attachments
-				log.write_information (generator + ".do_get Processing request guest_report_details ")
+				debug
+					log.write_information (generator + ".do_get Processing request guest_report_details ")
+				end
 				guest_report_details (req, res)
 			end
 		end
@@ -99,7 +103,7 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	retrieve_report_by (req: WSF_REQUEST; res: WSF_RESPONSE; a_type: READABLE_STRING_32; a_user: READABLE_STRING_32; a_id: READABLE_STRING_32 )
+	retrieve_report_by (req: WSF_REQUEST; res: WSF_RESPONSE; a_type: READABLE_STRING_8; a_user: READABLE_STRING_32; a_id: READABLE_STRING_32 )
 			-- Retrieve a report by a given ID in a path parameter /{$id}
 		local
 			l_rhf: ESA_REPRESENTATION_HANDLER_FACTORY
@@ -121,7 +125,7 @@ feature {NONE} -- Implementation
 
 		end
 
-	search_report (req: WSF_REQUEST; res: WSF_RESPONSE; a_type: READABLE_STRING_32; a_user: READABLE_STRING_32)
+	search_report (req: WSF_REQUEST; res: WSF_RESPONSE; a_type: READABLE_STRING_8; a_user: READABLE_STRING_32)
 			-- Search a report by a given if from a query, search=?.
 		local
 			l_rhf: ESA_REPRESENTATION_HANDLER_FACTORY
@@ -147,7 +151,7 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	retrieve_report_details (req: WSF_REQUEST; res: WSF_RESPONSE; a_type: READABLE_STRING_32; a_user: READABLE_STRING_32; a_id: INTEGER)
+	retrieve_report_details (req: WSF_REQUEST; res: WSF_RESPONSE; a_type: READABLE_STRING_8; a_user: READABLE_STRING_32; a_id: INTEGER)
 		local
 			l_rhf: ESA_REPRESENTATION_HANDLER_FACTORY
 		do
@@ -179,7 +183,7 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	retrieve_guest_report_by (req: WSF_REQUEST; res: WSF_RESPONSE; a_type: READABLE_STRING_32; a_id: READABLE_STRING_32 )
+	retrieve_guest_report_by (req: WSF_REQUEST; res: WSF_RESPONSE; a_type: READABLE_STRING_8; a_id: READABLE_STRING_32 )
 			-- Retrieve a report by a given ID in a path parameter /{$id}.
 		local
 			l_rhf: ESA_REPRESENTATION_HANDLER_FACTORY
@@ -201,7 +205,7 @@ feature {NONE} -- Implementation
 
 		end
 
-	search_guest_report (req: WSF_REQUEST; res: WSF_RESPONSE; a_type: READABLE_STRING_32)
+	search_guest_report (req: WSF_REQUEST; res: WSF_RESPONSE; a_type: READABLE_STRING_8)
 			-- Search a report by a given if from a query, search=?.
 		local
 			l_rhf: ESA_REPRESENTATION_HANDLER_FACTORY
@@ -227,7 +231,7 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	retrieve_guest_report_details (req: WSF_REQUEST; res: WSF_RESPONSE; a_type: READABLE_STRING_32; a_id: INTEGER)
+	retrieve_guest_report_details (req: WSF_REQUEST; res: WSF_RESPONSE; a_type: READABLE_STRING_8; a_id: INTEGER)
 		local
 			l_rhf: ESA_REPRESENTATION_HANDLER_FACTORY
 		do

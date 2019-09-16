@@ -27,11 +27,12 @@ feature {NONE} -- Initialization
 			make (a_api)
 
 				-- Initialize session related settings.
-			s := a_api.setup.string_8_item ("auth.oauth.token")
+			s := a_api.setup.site_auth_token ("oauth")
 			if s = Void then
 				s := a_api.setup.site_id + default_session_token_suffix
 			end
 			create session_token.make_from_string (s)
+			session_max_age := a_api.setup.site_auth_max_age ("oauth")
 		ensure
 			oauth_20_storage_set:  oauth_20_storage = a_oauth_storage
 		end
@@ -44,23 +45,26 @@ feature {CMS_MODULE} -- Access: Oauth storage.
 feature -- Access: tokens
 
 	default_session_token_suffix: STRING = "_OAUTH_TOKEN_"
-			-- Default value for `session_auth_token'.
+			-- Default value for `session_token'.
 
 	session_token: IMMUTABLE_STRING_8
 			-- Name of Cookie used to keep the session info.
 
+	session_max_age: INTEGER
+			-- Max age.	
+
 feature -- Access: Oauth20
 
-	user_oauth2_by_id (a_uid: like {CMS_USER}.id; a_consumer: READABLE_STRING_GENERAL): detachable CMS_USER
+	user_oauth2_by_user_id (a_uid: like {CMS_USER}.id; a_consumer: READABLE_STRING_GENERAL): detachable CMS_USER
 			-- Retrieve a user by id `a_uid' for the consumer `a_consumer', if any.
 		do
-			Result := oauth_20_storage.user_oauth2_by_id (a_uid, a_consumer)
+			Result := oauth_20_storage.user_oauth2_by_user_id (a_uid, a_consumer)
 		end
 
-	user_oauth2_by_email (a_email: like {CMS_USER}.email; a_consumer: READABLE_STRING_GENERAL): detachable CMS_USER
-			-- Retrieve a user by email `a_email' for the consumer `a_consumer', if any.
+	user_oauth2_by_id (a_oauth_id: READABLE_STRING_GENERAL; a_consumer: READABLE_STRING_GENERAL): detachable CMS_USER
+			-- Retrieve a user by id `a_oauth_id' for the consumer `a_consumer', if any.
 		do
-			Result := oauth_20_storage.user_oauth2_by_email (a_email, a_consumer)
+			Result := oauth_20_storage.user_oauth2_by_id (a_oauth_id, a_consumer)
 		end
 
 	user_oauth2_by_token (a_token: READABLE_STRING_GENERAL; a_consumer: READABLE_STRING_GENERAL): detachable CMS_USER
@@ -102,20 +106,25 @@ feature	-- Change: User OAuth20
 			oauth_20_storage.save_oauth_consumer (a_cons)
 		end
 
-	new_user_oauth2 (a_token: READABLE_STRING_GENERAL; a_user_profile: READABLE_STRING_GENERAL; a_user: CMS_USER; a_consumer: READABLE_STRING_GENERAL)
+	delete_oauth_consumer (a_cons: CMS_OAUTH_20_CONSUMER)
+		do
+			oauth_20_storage.delete_oauth_consumer (a_cons)
+		end
+
+	new_user_oauth2 (a_token: READABLE_STRING_GENERAL; a_user_profile: READABLE_STRING_GENERAL; a_user: CMS_USER; a_oauth_id: READABLE_STRING_GENERAL; a_consumer: READABLE_STRING_GENERAL)
 			-- Add a new user with oauth20 using the consumer `a_consumer'.
 		require
 			has_id: a_user.has_id
 		do
-			oauth_20_storage.new_user_oauth2 (a_token, a_user_profile, a_user, a_consumer)
+			oauth_20_storage.new_user_oauth2 (a_token, a_user_profile, a_user, a_oauth_id, a_consumer)
 		end
 
-	update_user_oauth2 (a_token: READABLE_STRING_GENERAL; a_user_profile: READABLE_STRING_GENERAL; a_user: CMS_USER; a_consumer_table: READABLE_STRING_GENERAL)
+	update_user_oauth2 (a_token: READABLE_STRING_GENERAL; a_user_profile: READABLE_STRING_GENERAL; a_user: CMS_USER; a_oauth_id: READABLE_STRING_GENERAL; a_consumer_table: READABLE_STRING_GENERAL)
 			-- Update user `a_user' with oauth2 for the consumer `a_consumer'.
 		require
 			has_id: a_user.has_id
 		do
-			oauth_20_storage.update_user_oauth2 (a_token, a_user_profile, a_user, a_consumer_table)
+			oauth_20_storage.update_user_oauth2 (a_token, a_user_profile, a_user, a_oauth_id, a_consumer_table)
 		end
 
 	remove_user_oauth2 (a_user: CMS_USER; a_consumer_table: READABLE_STRING_GENERAL)

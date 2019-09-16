@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "Generation of IL code. Null operation for Unix."
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
@@ -285,7 +285,7 @@ feature -- Variables access
 		do
 		end
 
-	generate_eiffel_metamorphose (a_type: TYPE_A)
+	generate_eiffel_metamorphose (a_type: BASIC_A)
 			-- Generate a metamorphose of `a_type' into a _REF type.
 		do
 		end
@@ -728,6 +728,11 @@ feature -- Constants generation
 		do
 		end
 
+	put_immutable_manifest_string_8 (s: READABLE_STRING_GENERAL)
+			-- <Precursor/>
+		do
+		end
+
 	put_manifest_string_32_from_system_string_local (n: INTEGER)
 			-- Create a manifest string by using local at position `n' which
 			-- should be of type SYSTEM_STRING.
@@ -737,6 +742,11 @@ feature -- Constants generation
 	put_manifest_string_32 (s: READABLE_STRING_32)
 			-- Put `s' on IL stack.
 			-- `s' is in UTF-8
+		do
+		end
+
+	put_immutable_manifest_string_32 (s: READABLE_STRING_32)
+			-- <Precursor/>
 		do
 		end
 
@@ -1022,7 +1032,7 @@ feature {CIL_CODE_GENERATOR, CUSTOM_ATTRIBUTE_GENERATOR} -- Custom attribute def
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2013, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[
@@ -1053,4 +1063,4 @@ note
 			Customer support http://support.eiffel.com
 		]"
 
-end -- class CIL_CODE_GENERATOR
+end

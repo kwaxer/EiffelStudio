@@ -24,7 +24,8 @@ inherit
 
 	CONF_TARGET_SETTINGS
 		rename
-			make as make_settings
+			make as make_settings,
+			setting_boolean as versioned_setting_boolean
 		redefine
 			options,
 			settings
@@ -81,13 +82,22 @@ feature -- Access, stored in configuration file
 	extends: detachable CONF_TARGET
 			-- If we extend another target, this is the other target.
 
-	remote_parent: detachable CONF_REMOTE_TARGET
-			-- Optional remote target as parent.
+	has_unresolved_parent: BOOLEAN
+			-- Has unresolved parent in `parent_reference`?
+			-- note: check CONF_PARENT_TARGET_CHECKER to resolve them, if any.
+		do
+			Result := extends = Void and attached parent_reference as par and then not par.has_error
+		end
+
+	parent_reference: detachable CONF_TARGET_REFERENCE
+			-- Optional target reference as parent.
+			-- Mainly use for remote target (i.e target from another Eiffel Configuration File).
+			-- This will be resolved to set `extends` value.
 
 	is_library_parent: BOOLEAN
-			-- Does `extends` refer to a library target corresponding to `parent_target_location` rather than to a specific target?
+			-- Does `extends` refer to a library target corresponding to `parent_reference.location` rather than to a specific target?
 		do
-			Result := attached remote_parent as p and then p.name = Void
+			Result := attached {CONF_REMOTE_TARGET_REFERENCE} parent_reference as p and then not p.has_name
 		end
 
 	system: CONF_SYSTEM
@@ -95,6 +105,166 @@ feature -- Access, stored in configuration file
 
 	is_abstract: BOOLEAN
 			-- Is this an abstract target? (i.e. cannot be used to compile the system).
+
+feature -- Access: settings
+
+	setting_boolean (n: READABLE_STRING_8): BOOLEAN
+			-- A value of the boolean setting of name `n`.
+		require
+			is_boolean_setting_known (n)
+		do
+			Result := versioned_setting_boolean (n, system.namespace)
+		end
+
+	setting_absent_explicit_assertion: BOOLEAN
+			-- Value of the setting "absent_explicit_assertion".
+		do
+			Result := setting_boolean (s_absent_explicit_assertion)
+		end
+
+	setting_address_expression: BOOLEAN
+			-- Value of the address_expression setting.
+		do
+			Result := setting_boolean (s_address_expression)
+		end
+
+	setting_array_optimization: BOOLEAN
+			-- Value of the array_optimization setting.
+		do
+			Result := setting_boolean (s_array_optimization)
+		end
+
+	setting_automatic_backup: BOOLEAN
+			-- Value for the automatic_backup setting.
+		do
+			Result := setting_boolean (s_automatic_backup)
+		end
+
+	setting_check_for_void_target: BOOLEAN
+			-- Value for the `check_for_void_target' setting.
+		do
+			Result := setting_boolean (s_check_for_void_target)
+		end
+
+	setting_check_for_catcall_at_runtime: BOOLEAN
+			-- Value for the `check_for_catcall_at_runtime' setting.
+		do
+			Result := setting_boolean (s_check_for_catcall_at_runtime)
+		end
+
+	setting_check_generic_creation_constraint: BOOLEAN
+			-- Value of the check_generic_creation_constraint setting.
+		do
+			Result := setting_boolean (s_check_generic_creation_constraint)
+		end
+
+	setting_check_vape: BOOLEAN
+			-- Value for the check_vape setting.
+		do
+			Result := setting_boolean (s_check_vape)
+		end
+
+	setting_console_application: BOOLEAN
+			-- Value for the console_application setting.
+		do
+			Result := setting_boolean (s_console_application)
+		end
+
+	setting_cls_compliant: BOOLEAN
+			-- Value for the cls_compliant setting.
+		do
+			Result := setting_boolean (s_cls_compliant)
+		end
+
+	setting_dead_code_removal: BOOLEAN
+			-- Value for the dead_code_removal setting.
+		do
+			Result := setting_boolean (s_dead_code_removal)
+		end
+
+	setting_dotnet_naming_convention: BOOLEAN
+			-- Value for the dotnet_naming_convention setting.
+		do
+			Result := setting_boolean (s_dotnet_naming_convention)
+		end
+
+	setting_dynamic_runtime: BOOLEAN
+			-- Value for the dynamic_runtime setting.
+		do
+			Result := setting_boolean (s_dynamic_runtime)
+		end
+
+	setting_enforce_unique_class_names: BOOLEAN
+			-- Valeu for the enforce_unique_class_names setting.
+		do
+			Result := setting_boolean (s_enforce_unique_class_names)
+		end
+
+	setting_exception_trace: BOOLEAN
+			-- Value for the exception_trace setting.
+		do
+			Result := setting_boolean (s_exception_trace)
+		end
+
+	setting_force_32bits: BOOLEAN
+			-- Value for the force_32bits setting.
+		do
+			Result := setting_boolean (s_force_32bits)
+		end
+
+	setting_il_verifiable: BOOLEAN
+			-- Value for the console_application setting.
+		do
+			Result := setting_boolean (s_il_verifiable)
+		end
+
+	setting_inlining: BOOLEAN
+			-- Value for the inlining setting.
+		do
+			Result := setting_boolean (s_inlining)
+		end
+
+	setting_java_generation: BOOLEAN
+			-- Value for the java_generation setting.
+		do
+			Result := setting_boolean (s_java_generation)
+		end
+
+	setting_line_generation: BOOLEAN
+			-- Value for the line_generation setting.
+		do
+			Result := setting_boolean (s_line_generation)
+		end
+
+	setting_msil_generation: BOOLEAN
+			-- Value for the msil_generation setting.
+		do
+			Result := setting_boolean (s_msil_generation)
+		end
+
+	setting_msil_use_optimized_precompile: BOOLEAN
+			-- Value for the msil_use_optimized_precompile setting.
+		do
+			Result := setting_boolean (s_msil_use_optimized_precompile)
+		end
+
+	setting_total_order_on_reals: BOOLEAN
+			-- Value for the total_order_on_reals setting.
+		do
+			Result := setting_boolean (s_total_order_on_reals)
+		end
+
+	setting_use_cluster_name_as_namespace: BOOLEAN
+			-- Value for the use_cluster_name_as_namespace setting.
+		do
+			Result := setting_boolean (s_use_cluster_name_as_namespace)
+		end
+
+	setting_use_all_cluster_name_as_namespace: BOOLEAN
+			-- Value for the use_all_cluster_name_as_namespace setting.
+		do
+			Result := setting_boolean (s_use_all_cluster_name_as_namespace)
+		end
 
 feature -- Access, in compiled only, not stored to configuration file
 
@@ -279,7 +449,10 @@ feature -- Access queries
 	settings: STRING_TABLE [READABLE_STRING_32]
 			-- Settings.
 		do
-			if attached extends as l_extends then
+			if
+				attached extends as l_extends and then
+				l_extends /= Current
+			then
 				Result := l_extends.settings.twin
 				Result.merge (Precursor)
 			else
@@ -427,19 +600,27 @@ feature -- Access queries
 		end
 
 	concurrency_mode: like {CONF_STATE}.concurrency
-			-- Concurrency mode to set `{CONF_STATE}.concurrency'
-			-- in the tools that process ECF.
+			-- Concurrency mode to set `{CONF_STATE}.concurrency' in the tools that process ECF.
 		do
-			inspect options.concurrency_capability.root_index
-			when {CONF_TARGET_OPTION}.concurrency_index_none then Result := concurrency_none
-			when {CONF_TARGET_OPTION}.concurrency_index_thread then Result := concurrency_multithreaded
-			when {CONF_TARGET_OPTION}.concurrency_index_scoop then Result := concurrency_scoop
-			end
+			Result := options.concurrency_mode
 		ensure
 			definition:
-				options.concurrency_capability.root_index = {CONF_TARGET_OPTION}.concurrency_index_none  and then Result = concurrency_none or else
-				options.concurrency_capability.root_index = {CONF_TARGET_OPTION}.concurrency_index_thread and then Result = concurrency_multithreaded or else
+				options.concurrency_capability.root_index = {CONF_TARGET_OPTION}.concurrency_index_none  and then Result = concurrency_none or
+				options.concurrency_capability.root_index = {CONF_TARGET_OPTION}.concurrency_index_thread and then Result = concurrency_multithreaded or
 				options.concurrency_capability.root_index = {CONF_TARGET_OPTION}.concurrency_index_scoop and then Result = concurrency_scoop
+		end
+
+	void_safety_mode: like {CONF_STATE}.void_safety
+			-- Void safety mode to set `{CONF_STATE}.void_safety' in the tools that process ECF.
+		do
+			Result := options.void_safety_mode
+		ensure
+			definition:
+				options.void_safety_capability.root_index = {CONF_TARGET_OPTION}.void_safety_index_none  and then Result = void_safety_none or
+				options.void_safety_capability.root_index = {CONF_TARGET_OPTION}.void_safety_index_conformance and then Result = void_safety_conformance or
+				options.void_safety_capability.root_index = {CONF_TARGET_OPTION}.void_safety_index_initialization and then Result = void_safety_initialization or
+				options.void_safety_capability.root_index = {CONF_TARGET_OPTION}.void_safety_index_transitional and then Result = void_safety_transitional or
+				options.void_safety_capability.root_index = {CONF_TARGET_OPTION}.void_safety_index_all and then Result = void_safety_all
 		end
 
 feature {CONF_ACCESS} -- Update, stored in configuration file
@@ -448,16 +629,13 @@ feature {CONF_ACCESS} -- Update, stored in configuration file
 			-- Set `name' to `a_name'.
 		require
 			a_name_ok: a_name /= Void and then not a_name.is_empty
-		local
-			l_lowered_name: like name
 		do
-			l_lowered_name := a_name.as_lower
 			if attached system as l_system then
-				l_system.targets.replace_key (l_lowered_name, name)
+				l_system.targets.replace_key (a_name, name)
 			end
-			name := l_lowered_name
+			name := a_name.string
 		ensure
-			name_set: name.is_case_insensitive_equal (a_name) and name.is_equal (name.as_lower)
+			name_set: name.is_equal (a_name)
 		end
 
 	set_description (a_description: like description)
@@ -474,13 +652,27 @@ feature {CONF_ACCESS} -- Update, stored in configuration file
 			a_target_not_void: a_target /= Void
 		do
 			extends := a_target
+			parent_reference := Void
+		ensure
+			parent_set: extends = a_target
+			no_parent_ref: parent_reference = Void
+		end
+
+	set_remote_parent (a_target: like extends)
+			-- Set `extends' to `a_target'.
+		require
+			a_target_not_void: a_target /= Void
+			a_target_not_readonly: not a_target.system.is_readonly
+			has_remote_reference: attached {CONF_REMOTE_TARGET_REFERENCE} parent_reference
+		do
+			extends := a_target
 		ensure
 			parent_set: extends = a_target
 		end
 
-	set_remote_parent (a_remote: like remote_parent)
+	reference_parent (a_parent: like parent_reference)
 		do
-			remote_parent := a_remote
+			parent_reference := a_parent
 		end
 
 	set_parent_by_name (a_target: STRING)
@@ -504,10 +696,10 @@ feature {CONF_ACCESS} -- Update, stored in configuration file
 			-- Remove the parent of the target (if any).
 		do
 			extends := Void
-			remote_parent := Void
+			parent_reference := Void
 		ensure
 			extends_unset: extends = Void
-			remote_parent_unset: remote_parent = Void
+			parent_reference_unset: parent_reference = Void
 		end
 
 	set_version (a_version: like version)
@@ -1009,7 +1201,16 @@ feature -- Equality
 					Result := True
 				elseif a_target.name.is_case_insensitive_equal_general (name) then
 					if attached system as s1 and attached a_target.system as s2 then
-						Result := (s1 = s2) or (s1.uuid ~ s2.uuid)
+						if s1 = s2 then
+							Result := True
+						else
+							if s1.is_generated_uuid and s2.is_generated_uuid then
+									-- Check system file path.
+								Result := s1.file_path.same_as (s2.file_path)
+							else
+								Result := s1.uuid ~ s2.uuid
+							end
+						end
 					else
 							-- Assume this is target of same system
 						Result := True
@@ -1228,7 +1429,7 @@ invariant
 	environ_variables_not_void: environ_variables /= Void
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

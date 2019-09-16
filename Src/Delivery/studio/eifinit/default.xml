@@ -101,6 +101,7 @@
 	<PREF NAME="tools.diagram_tool.client_depth" DESCRIPTION="Show clients of a class up to a level of preference value."><INTEGER>0</INTEGER></PREF>
 	<PREF NAME="tools.diagram_tool.descendant_depth" DESCRIPTION="Show descendants of a class down to a level of preference value."><INTEGER>1</INTEGER></PREF>
 	<PREF NAME="tools.diagram_tool.diagram_toolbar_layout" HIDDEN="true" DESCRIPTION="The visible toolbar items for the Diagram Tool toolbar."><LIST>Center_diagram__visible;Separator;New_links__visible;Create_class__visible;Class_header_hole__visible;Delete_item__visible;Separator;Undo_command__visible;History_tool__visible;Redo_command__visible;Separator;Delete_hole__visible;Separator;Force_directed__visible;UML_visibility__visible;Force_settings__visible;Context_depth__visible;Separator;Inherit_visibility__visible;Supplier_visibility__visible;Labels_visibility__visible;Separator;Fit_to_screen__visible;Link_tool__hidden;Color__hidden;High_quality__hidden;Clusters_visibility__hidden;Anchor_remove__hidden;Display_legend__hidden;Diagram_to_png__hidden;Cluster_filling__hidden;Zoom_out__hidden;Zoom_in__hidden</LIST></PREF>
+	<PREF NAME="tools.diagram_tool.enable_anti-aliasing" DESCRIPTION="Should anti-aliasing be used when drawing figures and connectors?"><BOOLEAN>True</BOOLEAN></PREF>
 	<PREF NAME="tools.diagram_tool.excluded_class_figures" DESCRIPTION="Names of classes that should not appear in generated diagrams."><LIST>INTEGER;BOOLEAN;STRING;CHARACTER;REAL;DOUBLE</LIST></PREF>
 	<PREF NAME="tools.diagram_tool.ignore_excluded_class_figures" DESCRIPTION="Show ALL classes in the diagram (ignore the following list)?"><BOOLEAN>False</BOOLEAN></PREF>
 	<PREF NAME="tools.diagram_tool.subcluster_depth" DESCRIPTION="Show subclusters of a cluster down to a level of preference value."><INTEGER>1</INTEGER></PREF>
@@ -139,6 +140,7 @@
 	<PREF NAME="tools.class_browser.expand_categorized_folder_level" HIDDEN="false" DESCRIPTION="Should categorized folder level in dependency view be expanded by default?"><BOOLEAN>False</BOOLEAN></PREF>	
 	<PREF NAME="tools.class_browser.inheritance_classes" HIDDEN="false" DESCRIPTION="Should inheritance classes be displayed?"><BOOLEAN>False</BOOLEAN></PREF>
 	<PREF NAME="tools.class_browser.show_item_path" HIDDEN="false" DESCRIPTION="Is item path shown?"><BOOLEAN>False</BOOLEAN></PREF>
+	<PREF NAME="tools.class_browser.show_item_description" HIDDEN="false" DESCRIPTION="Is item description shown?"><BOOLEAN>False</BOOLEAN></PREF>
 	<PREF NAME="tools.class_browser.show_self_dependency" HIDDEN="false" DESCRIPTION="Is dependency on self shown?"><BOOLEAN>False</BOOLEAN></PREF>
 	<PREF NAME="tools.class_browser.syntactical_classes" HIDDEN="false" DESCRIPTION="Should syntactical referenced classes be displayed?"><BOOLEAN>False</BOOLEAN></PREF>
 	<PREF NAME="tools.class_browser.normal_referenced_classes" HIDDEN="false" DESCRIPTION="Will normal referenced supplier/client classes be shown?"><BOOLEAN>True</BOOLEAN></PREF>
@@ -227,6 +229,8 @@
 	<PREF NAME="interface.dialogs.project_settings_split_position" DESCRIPTION="Position of the split area." HIDDEN="True"><INTEGER>220</INTEGER></PREF>
 	<PREF NAME="interface.dialogs.starting_dialog_width" DESCRIPTION="Width of the starting dialog." HIDDEN="True"><INTEGER>500</INTEGER></PREF>
 	<PREF NAME="interface.dialogs.starting_dialog_height" DESCRIPTION="Height of the starting dialog." HIDDEN="True"><INTEGER>500</INTEGER></PREF>
+	<PREF NAME="interface.dialogs.show_update_manager_dialog" DESCRIPTION="At startup, check for new release updates, and display the associated dialog if any."><BOOLEAN>True</BOOLEAN></PREF>
+	<PREF NAME="interface.dialogs.open_class_on_fix" DESCRIPTION="Should the fixed class open automatically in the editor?"><BOOLEAN>True</BOOLEAN></PREF>
 	<PREF NAME="interface.dialogs.open_project_dialog_width" DESCRIPTION="Width of the open project dialog." HIDDEN="True"><INTEGER>500</INTEGER></PREF>
 	<PREF NAME="interface.dialogs.open_project_dialog_height" DESCRIPTION="Height of the open project dialog." HIDDEN="True"><INTEGER>300</INTEGER></PREF>
 	<PREF NAME="interface.dialogs.discard_target_scope_customized_formatter" DESCRIPTION="Display confirmation dialog of discarding target scope customized formatter."><BOOLEAN>True</BOOLEAN></PREF>
@@ -286,6 +290,7 @@
 	<PREF NAME="editor.eiffel.once_and_constant_in_upper" DESCRIPTION="Does completion change the first character of onces and constants with an upper case character?"><BOOLEAN>False</BOOLEAN></PREF>
 	<PREF NAME="editor.eiffel.show_ANY_features" DESCRIPTION="Do features of class ANY appear in the feature call complete window?"><BOOLEAN>False</BOOLEAN></PREF>
 	<PREF NAME="editor.eiffel.show_completion_signature" DESCRIPTION="Does completion list show feature signatures?"><BOOLEAN>True</BOOLEAN></PREF>
+	<PREF NAME="editor.eiffel.show_completion_target_class" DESCRIPTION="Does completion dialog show target class?"><BOOLEAN>True</BOOLEAN></PREF>
 	<PREF NAME="editor.eiffel.show_completion_type" DESCRIPTION="Does completion list show query return type?"><BOOLEAN>True</BOOLEAN></PREF>
 	<PREF NAME="editor.eiffel.show_completion_disambiguated_name" DESCRIPTION="Does completion list show disambiguated name?"><BOOLEAN>False</BOOLEAN></PREF>
 	<PREF NAME="editor.eiffel.show_completion_tooltip" DESCRIPTION="Does completion list show an item's description as a tooltip?"><BOOLEAN>True</BOOLEAN></PREF>
@@ -674,7 +679,7 @@
 	<PREF NAME="editor.general.colors.spaces_background_color" DESCRIPTION="Background color of space characters."><COLOR>auto</COLOR></PREF>
 	<PREF NAME="editor.general.colors.comments_text_color" DESCRIPTION="Color of comments text."><COLOR>128;0;0</COLOR></PREF>
 	<PREF NAME="editor.general.colors.comments_background_color" DESCRIPTION="Background color of comments text."><COLOR>auto</COLOR></PREF>
-	<PREF NAME="editor.general.colors.operator_text_color" DESCRIPTION="Color of operator text."><COLOR>255;0;0</COLOR></PREF>
+	<PREF NAME="editor.general.colors.operator_text_color" DESCRIPTION="Color of operator text."><COLOR>224;0;0</COLOR></PREF>
 	<PREF NAME="editor.general.colors.operator_background_color" DESCRIPTION="Background color of operator text."><COLOR>auto</COLOR></PREF>
 	<PREF NAME="editor.general.colors.number_text_color" DESCRIPTION="Color of number text."><COLOR>128;0;255</COLOR></PREF>
 	<PREF NAME="editor.general.colors.number_background_color" DESCRIPTION="Background color of number text."><COLOR>auto</COLOR></PREF>
@@ -696,6 +701,7 @@
 	<PREF NAME="general.show_hidden_preferences" DESCRIPTION="Show hidden preferences in preference window?" HIDDEN="True"><BOOLEAN>False</BOOLEAN></PREF>
 	<PREF NAME="general.locale" DESCRIPTION="Locale current system uses. (Restart to take effect)" HIDDEN="False"><LIST>[Unselected]</LIST></PREF>
 	<PREF NAME="general.pick_and_drop_(pnd)_mode" DESCRIPTION="Use Pick and Drop mode? Contextual mode if false." HIDDEN="False"><BOOLEAN>False</BOOLEAN></PREF>
+	<PREF NAME="general.update_channel" DESCRIPTION="Update to newer release on stable or beta channel." HIDDEN="False"><LIST>[stable];beta</LIST></PREF>
 	<PREF NAME="general.eis_path" DESCRIPTION="Directories to search for Eiffel Information System incoming mechanism."><STRING></STRING></PREF>
 
 	<PREF NAME="tools.search_tool.init_incremental" DESCRIPTION="Initial status of incremental search."><BOOLEAN>True</BOOLEAN></PREF>
@@ -771,7 +777,7 @@
 	<PREF NAME="shortcuts.editor.zoom_out_numpad" DESCRIPTION="Trigger zoom out editor's font through numpad keys."><SHORTCUT Ctrl="True">NumPad -</SHORTCUT></PREF>
 	<PREF NAME="shortcuts.editor.zoom_reset" DESCRIPTION="Trigger resetting editor's font."><SHORTCUT Ctrl="True">0</SHORTCUT></PREF>
 	<PREF NAME="shortcuts.editor.zoom_reset_numpad" DESCRIPTION="Trigger resetting editor's font through numpad keys."><SHORTCUT Ctrl="True">NumPad 0</SHORTCUT></PREF>
-		
+	<PREF NAME="shortcuts.editor.insert_symbol" DESCRIPTION="Insert symbol using specific dialog."><SHORTCUT Ctrl="True" Alt="true">Space</SHORTCUT></PREF>
 	<PREF NAME="shortcuts.external_commands.shortcut_0" DESCRIPTION="First external command shortcut."><SHORTCUT Alt="True">0</SHORTCUT></PREF>
 	<PREF NAME="shortcuts.external_commands.shortcut_1" DESCRIPTION="Second external command shortcut."><SHORTCUT Alt="True">1</SHORTCUT></PREF>
 	<PREF NAME="shortcuts.external_commands.shortcut_2" DESCRIPTION="Third external command shortcut."><SHORTCUT Alt="True">2</SHORTCUT></PREF>

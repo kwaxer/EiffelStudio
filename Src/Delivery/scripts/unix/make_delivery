@@ -79,6 +79,10 @@ md $INSTALL_DIR
 cd $INSTALL_DIR
 remtrace studio
 exprt -r $ORIGO_SVN_REVISION $DEFAULT_ORIGO_SVN/Src/Delivery/studio studio 
+fullrd studio/bitmaps/src
+fullrd studio/bitmaps/png/icons_16x16.png
+fullrd studio/bitmaps/png/small_12x12.png
+fullrd studio/bitmaps/png/icons_10x10.png
 fullrd studio/spec/windows
 fullrd studio/spec/win64
 fullrd studio/config/windows
@@ -231,8 +235,8 @@ if [ ! "$NO_COMPILE" ]; then
 		chmod +x $INSTALL_DIR/studio/spec/unix/finish_freezing 
 	fi
 
-	remtrace ISE specific files for enterprise edition
 	if [ "$MULTIPLE_EDITIONS" ]; then
+		remtrace ISE specific files: enterprise edition
 		cd $EIFFEL_SRC
 		exprt $DEFAULT_ISE_SVN/Src/library/keygen library/keygen
 		cd tools

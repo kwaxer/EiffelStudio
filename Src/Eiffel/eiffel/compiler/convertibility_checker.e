@@ -111,7 +111,11 @@ feature -- Initialization/Checking
 								l_feat.conversion_types.after or has_error
 							loop
 								l_type := l_feat.conversion_types.item
-								l_named_type ?= type_a_generator.evaluate_type (l_type, a_class)
+								if attached {DEANCHORED_TYPE_A} type_a_generator.evaluate_type (l_type, a_class) as nt then
+									l_named_type := nt
+								else
+									l_named_type := Void
+								end
 								if
 									l_named_type = Void or else
 									not l_named_type.is_full_named_type
@@ -147,7 +151,7 @@ feature -- Initialization/Checking
 											l_named_type.check_for_obsolete_class (a_class, Void)
 
 												-- We request that conversion type is attached only for the highest level
-												-- of void-safety.
+												-- of void safety.
 											if
 												a_class.lace_class.is_void_safe_call and then
 												not l_named_type.is_attached
@@ -334,7 +338,7 @@ feature -- Initialization/Checking
 
 				-- We do not allow conversion of the form `source.to_target' or
 				-- `create target.make_from (source)' if `source' is not attached
-				-- as otherwise this we would be breaking void-safety.
+				-- as otherwise this we would be breaking void safety.
 			if a_source_type.is_attached or else not a_context_class.lace_class.is_void_safe_call then
 				if a_target_type.has_associated_class then
 					l_target_class := a_target_type.base_class
@@ -781,7 +785,7 @@ feature {NONE} -- Implementation: access
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2016, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

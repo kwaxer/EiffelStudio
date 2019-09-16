@@ -273,11 +273,32 @@ feature -- Search
 
 feature {EB_COMMAND, EB_DEVELOPMENT_WINDOW, EB_DEVELOPMENT_WINDOW_MENU_BUILDER} -- Commands
 
+	complete_alias_name
+		do
+			if
+				not is_empty and then
+				attached text_displayed.cursor as l_cursor and then
+				attached {EDITOR_TOKEN_STRING} l_cursor.token as str_tok
+			then
+				if
+					attached {EDITOR_TOKEN_SPACE} str_tok.previous as space_tok and then
+					attached {EDITOR_TOKEN_KEYWORD} space_tok.previous as kwd_tok and then
+					kwd_tok.wide_image.is_case_insensitive_equal_general ("alias")
+				then
+						-- Insert text
+					set_completing_alias_name (True)
+					complete_code
+				end
+			else
+				complete_feature_name
+			end
+		end
+
 	complete_feature_name
 			-- Complete feature name.
 		do
 			if not is_empty and then text_displayed.completing_context and is_editable then
-				set_completing_feature (True)
+				set_completing_feature
 				if auto_complete_after_dot and then not shifted_key then
 					completing_automatically := True
 				end
@@ -289,7 +310,7 @@ feature {EB_COMMAND, EB_DEVELOPMENT_WINDOW, EB_DEVELOPMENT_WINDOW_MENU_BUILDER} 
 			-- Complete class name.
 		do
 			if not is_empty and then text_displayed.completing_context and is_editable then
-				set_completing_feature (False)
+				set_completing_class
 				if auto_complete_after_dot and then not shifted_key then
 					completing_automatically := True
 				end
@@ -441,7 +462,7 @@ feature -- Process Vision2 events
 				text_displayed.completing_context and then
 				is_char_activator_character (character_string.item (1))
 			then
-				set_completing_feature (True)
+				set_completing_feature
 				trigger_completion
 				debug ("Auto_completion")
 					print ("Completion triggered.%N")
@@ -1014,22 +1035,22 @@ feature {EB_SAVE_FILE_COMMAND, EB_SAVE_ALL_FILE_COMMAND, EB_DEVELOPMENT_WINDOW, 
 			end
 		end
 
-	set_title_saved_with (a_saved: BOOLEAN; a_title: STRING)
+	set_title_saved_with (a_saved: BOOLEAN; a_title: READABLE_STRING_32)
 			-- Set '*' in the title base on `a_saved'.
 			-- `a_title' will be used as name in editor docking_content
 		require
 			not_void: a_title /= Void
 		local
-			l_short_title: STRING
-			l_title: STRING
+			l_short_title: READABLE_STRING_32
+			l_title: STRING_32
 		do
 			if docking_content /= Void then
 				if not a_title.is_empty then
 					-- We must twin it, otherwise it will change the class name
-					l_title := a_title.twin
+					create l_title.make_from_string (a_title)
 
 					-- First we make sure docking_content title has `l_title'
-					l_short_title := docking_content.short_title.as_string_8
+					l_short_title := docking_content.short_title
 					if l_short_title = Void or else not l_short_title.has_substring (l_title) then
 						docking_content.set_short_title (l_title)
 						docking_content.set_long_title (l_title)
@@ -1202,7 +1223,7 @@ feature {NONE} -- Implementation
 			-- Create array of customizable commands.
 		do
 			create customizable_commands.make (11)
-			customizable_commands.put (agent complete_feature_name, "autocomplete")
+			customizable_commands.put (agent complete_alias_name, "autocomplete")
 			customizable_commands.put (agent complete_class_name, "class_autocomplete")
 			customizable_commands.put (agent quick_search, "show_quick_search_bar")
 			customizable_commands.put (agent replace, "show_search_and_replace_panel")
@@ -1548,7 +1569,7 @@ feature {NONE} -- Code completable implementation
 					a_shift = l_shortcut_pref.is_shift
 				then
 					Result := True
-					set_completing_feature (True)
+					set_completing_feature
 				end
 
 				l_shortcut_pref := preferences.editor_data.shortcuts.item ("class_autocomplete")
@@ -1560,7 +1581,7 @@ feature {NONE} -- Code completable implementation
 					a_shift = l_shortcut_pref.is_shift
 				then
 					Result := True
-					set_completing_feature (False)
+					set_completing_class
 				end
 			end
 		end
@@ -2120,7 +2141,7 @@ feature {NONE} -- Implementation: Internal cache
 			-- Note: Do not use directly!
 
 ;note
-	copyright: "Copyright (c) 1984-2017, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

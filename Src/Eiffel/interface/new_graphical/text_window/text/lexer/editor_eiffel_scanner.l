@@ -91,7 +91,9 @@ UTF8_tail	[\x80-\xBF]
 "}"					|
 "["					|
 "]"					|
-"$"					{
+"$"					|
+\xE2\x9F\xA6				|
+\xE2\x9F\xA7				{
 						-- Symbols
 					if not in_comments then
 						curr_token := new_text (text)
@@ -245,7 +247,7 @@ UTF8_tail	[\x80-\xBF]
 
 ----------/** Eiffel identifiers **/--------------------------------------------
 
-([A-Z]|{NON_ASCII})([A-Z0-9_]|{NON_ASCII})*							{
+[A-Z][A-Z0-9_]*							{
 										if not in_comments then
 											if is_current_group_valid then
 												tmp_classes := current_group.class_by_name (text, True)
@@ -265,7 +267,7 @@ UTF8_tail	[\x80-\xBF]
 										}
 
 
-([a-zA-Z]|{NON_ASCII})([a-zA-Z0-9_]|{NON_ASCII})*					{
+[a-zA-Z][a-zA-Z0-9_]*					{
 										if not in_comments then
 											curr_token := new_text (text)											
 										else
@@ -277,9 +279,9 @@ UTF8_tail	[\x80-\xBF]
 
 ----------/** Eiffel free operators **/-----------------------------------------
 
-[@#|&][^%" \t\r\n]*						{
+([@#|&][^%" \t\r\n]*)|{NON_ASCII}					{
 										if not in_comments then
-											curr_token := new_text (text)										
+											curr_token := new_operator (text)
 										else
 											curr_token := new_comment (text)
 										end
@@ -358,7 +360,7 @@ UTF8_tail	[\x80-\xBF]
 --     the special character such as %N, %T,... we have to list all of
 --     them in the second expression.
 
- \"([^\n"%]|{NON_ASCII})*\[/[ \t\r]* {
+ \"([^\n"%]|{NON_ASCII})*[\[\{]/[ \t\r]* {
  		if not in_comments then
 				-- Verbatim string opener.
 			curr_token := new_string (text)
@@ -372,22 +374,8 @@ UTF8_tail	[\x80-\xBF]
 		end
 	}
 
-\"([^\n"%]|{NON_ASCII})*\{/[ \t\r]* {
-		if not in_comments then
-				-- Verbatim string opener.
-			curr_token := new_string (text)
-			update_token_list
-			in_verbatim_string := True
-			start_of_verbatim_string := True
-			set_start_condition (VERBATIM_STR1)
-		else
-			curr_token := new_comment (text)
-			update_token_list
-		end				
-	}
-
 <VERBATIM_STR1>{
-	[ \t\r]*\]([^%\n"]|{NON_ASCII})*\" {
+	[ \t\r]*[\]\}]([^%\n"]|{NON_ASCII})*\" {
 				-- Verbatim string closer, possibly.
 			curr_token := new_string (text)						
 			end_of_verbatim_string := True
@@ -395,16 +383,6 @@ UTF8_tail	[\x80-\xBF]
 			set_start_condition (INITIAL)
 			update_token_list
 		}
-	
-	[ \t\r]*\}([^%\n"]|{NON_ASCII})*\" {
-				-- Verbatim string closer, possibly.
-			curr_token := new_string (text)						
-			end_of_verbatim_string := True
-			in_verbatim_string := False
-			set_start_condition (INITIAL)
-			update_token_list
-		}	
-	
 	[ ]+ {
 			curr_token := new_space (text_count)
 			update_token_list						
@@ -429,15 +407,17 @@ UTF8_tail	[\x80-\xBF]
 			curr_token := new_text (text)
 			update_token_list
 		}
-					
-	([^\n\ \t]|{NON_ASCII})* {
+	\" {
+			curr_token := new_string (text)
+			update_token_list
+		}
+	([^\n\ \t\"]|{NON_ASCII})* {
 			curr_token := new_string (text)
 			update_token_list
 		}
 	}
 
-[%\"]([^\n\"]|{NON_ASCII}|%\")*(\"|%)	|
-[%\"]([^\n\"\%]|{NON_ASCII}|%\"|%A|%B|%C\%D|%F|%H|%L|%N|%Q|%R|%S|%T|%U|%V|%%|%\'|%\(|%\)|%<|%>|%\/[0-9]{1,3}\/)* {
+[%\"]([^\n\"%]|{NON_ASCII}|%\"|%A|%B|%C|%D|%F|%H|%L|%N|%Q|%R|%S|%T|%U|%V|%%|%\'|%\(|%\)|%<|%>|%\/[0-9]{1,3}\/)*[%\"] {
 			-- Eiffel String
 		if not in_comments then						
 			curr_token := new_string (text)
@@ -522,7 +502,7 @@ UTF8_tail	[\x80-\xBF]
 %%
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

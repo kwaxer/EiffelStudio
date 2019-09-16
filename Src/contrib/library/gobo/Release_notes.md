@@ -1,21 +1,10 @@
-# Release notes - Gobo Eiffel 4.1
+# Release notes - Gobo Eiffel 19.06.21.1
 
-The focus of this release has been put on Continuous Integration
-and Continuous Delivery. Indeed the technology behind the tools
-of the Gobo package makes them very suitable for this kind of
-tasks, complementary to your favorite Eiffel development tools
-such as ISE EiffelStudio. Therefore:
-
-* The documentation of `gelint`, a useful tool to check the validity
-  rules in your Eiffel system, has been added.
-* A new tool, `gedoc`, for pretty-printing and generation of
-  HTML documentation out of Eiffel classes, has been implemented.
-
-For more details, see [History.md](History.md).
+In order to see what is new in this release, please read [History.md](./History.md).
 
 ## Compiler specific notes
 
-### ISE 16.05.9.8969 and 17.01.9.9700 (ISE Eiffel)
+### ISE 19.05.10.3187 (ISE Eiffel)
 
 * The ECF files for ISE Eiffel provided in this package are for
   Eiffel classic. In order to get ECF files configured for Eiffel
@@ -29,4 +18,4 @@ For more details, see [History.md](History.md).
 
 ## Authors
 
-Copyright (c) 1997-2017, Eric Bezault and others
+Copyright (c) 1997-2019, Eric Bezault and others

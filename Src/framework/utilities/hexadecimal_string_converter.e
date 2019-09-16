@@ -14,7 +14,7 @@ inherit
 
 feature -- Access
 
-	hex_to_integer_32 (s: STRING): INTEGER_32
+	hex_to_integer_32 (s: READABLE_STRING_8): INTEGER_32
 			-- Hexadecimal string `s' converted to INTEGER_32 value
 		require
 			s_not_void: s /= Void
@@ -43,9 +43,11 @@ feature -- Access
 				end
 				i := i + 1
 			end
+		ensure
+			instance_free: class
 		end
 
-	hex_to_integer_64 (s: STRING): INTEGER_64
+	hex_to_integer_64 (s: READABLE_STRING_8): INTEGER_64
 			-- Hexadecimal string `s' converted to INTEGER_64 value
 		require
 			s_not_void: s /= Void
@@ -74,9 +76,11 @@ feature -- Access
 				end
 				i := i + 1
 			end
+		ensure
+			instance_free: class
 		end
 
-	hex_to_pointer (s: STRING): POINTER
+	hex_to_pointer (s: READABLE_STRING_8): POINTER
 			-- Hexadecimal string `s' converted to POINTER value
 		require
 			s_not_void: s /= Void
@@ -91,6 +95,8 @@ feature -- Access
 				val_32 := hex_to_integer_32 (s)
 				($Result).memory_copy ($val_32, Pointer_bytes)
 			end
+		ensure
+			instance_free: class
 		end
 
 note

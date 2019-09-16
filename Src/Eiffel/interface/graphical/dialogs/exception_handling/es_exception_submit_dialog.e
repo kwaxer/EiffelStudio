@@ -175,6 +175,13 @@ feature {NONE} -- Initialization
 					end
 				end)
 
+			l_shrinkable.dpi_changed_actions.extend (agent (a_dpi, a_x: INTEGER_32; a_y: INTEGER_32; a_width: INTEGER_32; a_height: INTEGER_32)
+				do
+					if a_width > 0 and a_height > 0 then
+						shrink_widget.set_item_size (login_frame, a_width, a_height)
+					end
+				end)
+
 			a_container.extend (l_shrinkable)
 			a_container.disable_item_expand (l_shrinkable)
 
@@ -454,7 +461,7 @@ feature {NONE} -- Action handlers
 			execute_with_busy_cursor (agent
 				local
 					l_error: ES_ERROR_PROMPT
-					l_error_info: STRING
+					l_error_info: STRING_32
 				do
 					login_button.disable_sensitive
 					support_login.force_logout
@@ -470,14 +477,14 @@ feature {NONE} -- Action handlers
 					else
 						if support_login.is_bad_request then
 							if attached support_login.last_error as ll_error then
-								l_error_info := "Unable to login due to network problem. Please try again later."
-								l_error_info.append ("%N")
+								l_error_info := {STRING_32} "Unable to login due to network problem. Please try again later."
+								l_error_info.append_character ('%N')
 								l_error_info.append (ll_error)
 							else
-								l_error_info := "Unable to login due to network problem. Please try again later."
+								l_error_info := {STRING_32} "Unable to login due to network problem. Please try again later."
 							end
 						else
-							l_error_info := "Unable to login with the specified user name and password. Please check and try again."
+							l_error_info := {STRING_32} "Unable to login with the specified user name and password. Please check and try again."
 						end
 
 						create l_error.make_standard (l_error_info)
@@ -491,7 +498,8 @@ feature {NONE} -- Action handlers
 							-- Set focus back to button, as it will have been the last focused widget
 						login_button.set_focus
 					end
-				end)
+				end
+			)
 		end
 
 	on_logout
@@ -1053,7 +1061,7 @@ invariant
 	shrink_interval_positive: shrink_interval > 0
 
 ;note
-	copyright: "Copyright (c) 1984-2018, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

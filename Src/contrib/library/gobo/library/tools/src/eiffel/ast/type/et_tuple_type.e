@@ -5,7 +5,7 @@ note
 		"Eiffel TUPLE types"
 
 	library: "Gobo Eiffel Tools Library"
-	copyright: "Copyright (c) 2003-2016, Eric Bezault and others"
+	copyright: "Copyright (c) 2003-2018, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -26,6 +26,7 @@ inherit
 			tuple_keyword, actual_parameters,
 			resolved_formal_parameters_with_type_mark,
 			append_unaliased_to_string,
+			append_runtime_name_to_string,
 			type_with_type_mark,
 			type_mark,
 			overridden_type_mark
@@ -399,35 +400,36 @@ feature {ET_TYPE, ET_TYPE_CONTEXT} -- Comparison
 
 feature -- Conformance
 
-	conforms_to_type_with_type_marks (other: ET_TYPE; other_type_mark: detachable ET_TYPE_MARK; other_context: ET_TYPE_CONTEXT; a_type_mark: detachable ET_TYPE_MARK; a_context: ET_TYPE_CONTEXT): BOOLEAN
+	conforms_to_type_with_type_marks (other: ET_TYPE; other_type_mark: detachable ET_TYPE_MARK; other_context: ET_TYPE_CONTEXT; a_type_mark: detachable ET_TYPE_MARK; a_context: ET_TYPE_CONTEXT; a_system_processor: ET_SYSTEM_PROCESSOR): BOOLEAN
 			-- Same as `conforms_to_type' except that the type mark status of `Current'
 			-- and `other' is overridden by `a_type_mark' and `other_type_mark', if not Void
 		do
 			if other = Current and then other_type_mark = a_type_mark and then (other_context = a_context or else not is_generic) then
 				Result := True
 			else
-				Result := other.conforms_from_tuple_type_with_type_marks (Current, a_type_mark, a_context, other_type_mark, other_context)
+				Result := other.conforms_from_tuple_type_with_type_marks (Current, a_type_mark, a_context, other_type_mark, other_context, a_system_processor)
 			end
 		end
 
 feature {ET_TYPE, ET_TYPE_CONTEXT} -- Conformance
 
-	conforms_from_class_type_with_type_marks (other: ET_CLASS_TYPE; other_type_mark: detachable ET_TYPE_MARK; other_context: ET_TYPE_CONTEXT; a_type_mark: detachable ET_TYPE_MARK; a_context: ET_TYPE_CONTEXT): BOOLEAN
+	conforms_from_class_type_with_type_marks (other: ET_CLASS_TYPE; other_type_mark: detachable ET_TYPE_MARK; other_context: ET_TYPE_CONTEXT; a_type_mark: detachable ET_TYPE_MARK; a_context: ET_TYPE_CONTEXT; a_system_processor: ET_SYSTEM_PROCESSOR): BOOLEAN
 			-- Does `other' type appearing in `other_context' conform
 			-- to current type appearing in `a_context'?
 			-- Note that the type mark status of `Current' and `other' is
 			-- overridden by `a_type_mark' and `other_type_mark', if not Void
-			-- (Note: 'current_system.ancestor_builder' is used on the classes
+			-- (Note: 'a_system_processor.ancestor_builder' is used on the classes
 			-- whose ancestors need to be built in order to check for conformance.)
 		local
 			other_base_class: ET_CLASS
 		do
 			other_base_class := other.base_class
 			if other_base_class.is_none then
-					-- Class type "NONE" is always detachable regardless of type marks.
-					-- Therefore it conforms to any detachable tuple type since tuple types are reference types.
+					-- Class type "detachable NONE" conforms to any class type that is not expanded nor attached.
+					-- Class type "attached NONE" conforms to any attached class type that is not expanded.
+					-- And tuple types are reference types.
 				if other_context.attachment_type_conformance_mode then
-					Result := is_type_detachable_with_type_mark (a_type_mark, a_context)
+					Result := is_type_attached_with_type_mark (a_type_mark, a_context) implies other.is_type_attached_with_type_mark (other_type_mark, other_context)
 				else
 					Result := True
 				end
@@ -441,12 +443,12 @@ feature {ET_TYPE, ET_TYPE_CONTEXT} -- Conformance
 			end
 		end
 
-	conforms_from_tuple_type_with_type_marks (other: ET_TUPLE_TYPE; other_type_mark: detachable ET_TYPE_MARK; other_context: ET_TYPE_CONTEXT; a_type_mark: detachable ET_TYPE_MARK; a_context: ET_TYPE_CONTEXT): BOOLEAN
+	conforms_from_tuple_type_with_type_marks (other: ET_TUPLE_TYPE; other_type_mark: detachable ET_TYPE_MARK; other_context: ET_TYPE_CONTEXT; a_type_mark: detachable ET_TYPE_MARK; a_context: ET_TYPE_CONTEXT; a_system_processor: ET_SYSTEM_PROCESSOR): BOOLEAN
 			-- Does `other' type appearing in `other_context' conform
 			-- to current type appearing in `a_context'?
 			-- Note that the type mark status of `Current' and `other' is
 			-- overridden by `a_type_mark' and `other_type_mark', if not Void
-			-- (Note: 'current_system.ancestor_builder' is used on the classes
+			-- (Note: 'a_system_processor.ancestor_builder' is used on the classes
 			-- whose ancestors need to be built in order to check for conformance.)
 		do
 			if other = Current and then other_type_mark = a_type_mark and then (other_context = a_context or else not is_generic) then
@@ -460,7 +462,7 @@ feature {ET_TYPE, ET_TYPE_CONTEXT} -- Conformance
 				check other_not_generic: not other.is_generic end
 				Result := l_actual_parameters.is_empty
 			else
-				Result := l_other_actual_parameters.tuple_conforms_to_types (l_actual_parameters, a_context, other_context)
+				Result := l_other_actual_parameters.tuple_conforms_to_types (l_actual_parameters, a_context, other_context, a_system_processor)
 			end
 		end
 
@@ -494,14 +496,7 @@ feature -- Output
 			-- current type to `a_string'.
 		do
 			if attached type_mark as l_type_mark then
-				if l_type_mark.is_implicit_mark then
-					a_string.append_character ('[')
-				end
-				a_string.append_string (l_type_mark.text)
-				if l_type_mark.is_implicit_mark then
-					a_string.append_character (']')
-				end
-				a_string.append_character (' ')
+				l_type_mark.append_to_string_with_space (a_string)
 			end
 			a_string.append_string (tuple_string)
 			if attached actual_parameters as l_actual_parameters and then not l_actual_parameters.is_empty then
@@ -517,19 +512,31 @@ feature -- Output
 			-- are replaced by the associated types such as INTEGER_32.
 		do
 			if attached type_mark as l_type_mark then
-				if l_type_mark.is_implicit_mark then
-					a_string.append_character ('[')
-				end
-				a_string.append_string (l_type_mark.text)
-				if l_type_mark.is_implicit_mark then
-					a_string.append_character (']')
-				end
-				a_string.append_character (' ')
+				l_type_mark.append_to_string_with_space (a_string)
 			end
 			a_string.append_string (tuple_string)
 			if attached actual_parameters as l_actual_parameters and then not l_actual_parameters.is_empty then
 				a_string.append_character (' ')
 				l_actual_parameters.append_unaliased_to_string (a_string)
+			end
+		end
+
+	append_runtime_name_to_string (a_string: STRING)
+			-- Append to `a_string' textual representation of unaliased
+			-- version of current type as returned by 'TYPE.runtime_name'.
+			-- An unaliased version if when aliased types such as INTEGER
+			-- are replaced by the associated types such as INTEGER_32.
+		do
+			if base_class.current_system.attachment_type_conformance_mode then
+					-- Void-safe mode.
+				if is_attached then
+					a_string.append_character ('!')
+				end
+			end
+			a_string.append_string (tuple_string)
+			if attached actual_parameters as l_actual_parameters and then not l_actual_parameters.is_empty then
+				a_string.append_character (' ')
+				l_actual_parameters.append_runtime_name_to_string (a_string)
 			end
 		end
 

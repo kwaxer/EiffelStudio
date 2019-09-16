@@ -116,6 +116,13 @@ feature -- Element change
 			internal_hash_code := 0
 		end
 
+	put_character (c: CHARACTER_8; i: INTEGER)
+			-- Replace character at position `i' by character `c'.
+		do
+			area.put (c, i - 1)
+			internal_hash_code := 0
+		end
+
 feature -- Conversion
 
 	frozen to_cil: SYSTEM_STRING
@@ -134,7 +141,7 @@ feature -- Output
 		end
 
 ;note
-	copyright: "Copyright (c) 1984-2015, Eiffel Software and others"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software and others"
 	license: "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software

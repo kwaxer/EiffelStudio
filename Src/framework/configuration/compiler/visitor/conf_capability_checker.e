@@ -3,12 +3,12 @@
 	instruction: "[
 			The following violations are detected:
 			1. Class void safety level is less than the level of its cluster.
-			2. Class cat-call detected level is less than the level of its cluster.
-			3. Target capability option should be less than capability option of
+			2. Class cat-call detection level is less than the level of its cluster.
+			3. Target capability option is greater than capability option of
 				a) a target (if any) it extends (reported as warning because 5 will catch actual issues)
 				b) any group it depends on
-			4. Target root option should be less than target capability option.
-			5. Root target root option should be less than any dependent target capability option.
+			4. Target root option is greater than target capability option.
+			5. Target root option is greater than any dependent target capability option.
 		]"
 
 class CONF_CAPABILITY_CHECKER
@@ -65,14 +65,14 @@ feature {CONF_VISITABLE} -- Visitor
 			old_target: CONF_TARGET
 			old_condition: CONF_CONDITION_LIST
 		do
+				-- Check usage of a parent target or of a library target in the current target.
+			if t /= root_target and then not is_precompile then
+				check_target (t, target)
+			end
 			if not targets.has (t) then
+					-- Perform checks in the context of supplied target.
 				targets.force (t)
 				old_target := target
-					-- Check usage of a parent target or of a library target in the current target.
-				if t /= root_target and then not is_precompile then
-					check_target (t, old_target)
-				end
-					-- Perform checks in the context of supplied target.
 				target := t
 				if attached t.extends as parent then
 						-- Recurse to parent.
@@ -285,7 +285,7 @@ feature {NONE} -- Traversal
 						conf_interface_names.option_concurrency_value [t.options.concurrency.index],
 						conf_interface_names.option_concurrency_name))
 				end
-				if option.void_safety.index < t.options.void_safety.index then
+				if option.void_safety.index < restricted_void_safety (t.options.void_safety.index) then
 					observer.report_warning (create {CONF_ERROR_TARGET_CAPABILITY}.make
 						(parent,
 						t,
@@ -323,17 +323,15 @@ feature {NONE} -- Traversal
 
 	restricted_concurrency (index: like {CONF_TARGET_OPTION}.concurrency_index_none): like {CONF_TARGET_OPTION}.concurrency_index_none
 			-- Concurrency index `index` restricted by current condition `condition`.
+		require
+			{CONF_TARGET_OPTION}.is_concurrency_index (index)
 		local
 			value: INTEGER
 		do
 			Result := index
 			if attached condition as cs then
 				from
-					inspect Result
-					when {CONF_TARGET_OPTION}.concurrency_index_thread then value := {CONF_CONSTANTS}.concurrency_multithreaded
-					when {CONF_TARGET_OPTION}.concurrency_index_none then value := {CONF_CONSTANTS}.concurrency_none
-					when {CONF_TARGET_OPTION}.concurrency_index_scoop then value := {CONF_CONSTANTS}.concurrency_scoop
-					end
+					value := {CONF_TARGET_OPTION}.concurrency_mode_from_index (index)
 				until
 					Result = {CONF_TARGET_OPTION}.concurrency_index_thread or else
 					across cs as ic some attached ic.item.concurrency as s implies (s.value.has (value) xor s.invert) end
@@ -349,6 +347,44 @@ feature {NONE} -- Traversal
 					end
 				end
 			end
+		ensure
+			{CONF_TARGET_OPTION}.is_concurrency_index (Result)
+		end
+
+	restricted_void_safety (index: like {CONF_TARGET_OPTION}.void_safety_index_none): like {CONF_TARGET_OPTION}.void_safety_index_none
+			-- Void_safety index `index` restricted by current condition `condition`.
+		require
+			{CONF_TARGET_OPTION}.is_void_safety_index (index)
+		local
+			value: INTEGER
+		do
+			Result := index
+			if attached condition as cs then
+				from
+					value := {CONF_TARGET_OPTION}.void_safety_mode_from_index (index)
+				until
+					Result = {CONF_TARGET_OPTION}.void_safety_index_none or else
+					across cs as ic some attached ic.item.void_safety as s implies (s.value.has (value) xor s.invert) end
+				loop
+						-- Move to the smaller capability.
+					inspect Result
+					when {CONF_TARGET_OPTION}.void_safety_index_all then
+						Result := {CONF_TARGET_OPTION}.void_safety_index_transitional
+						value := {CONF_CONSTANTS}.void_safety_transitional
+					when {CONF_TARGET_OPTION}.void_safety_index_transitional then
+						Result := {CONF_TARGET_OPTION}.void_safety_index_initialization
+						value := {CONF_CONSTANTS}.void_safety_initialization
+					when {CONF_TARGET_OPTION}.void_safety_index_initialization then
+						Result := {CONF_TARGET_OPTION}.void_safety_index_conformance
+						value := {CONF_CONSTANTS}.void_safety_conformance
+					when {CONF_TARGET_OPTION}.void_safety_index_conformance then
+						Result := {CONF_TARGET_OPTION}.void_safety_index_none
+						value := {CONF_CONSTANTS}.void_safety_none
+					end
+				end
+			end
+		ensure
+			{CONF_TARGET_OPTION}.is_void_safety_index (Result)
 		end
 
 note

@@ -5,7 +5,7 @@ note
 		"Eiffel dynamic type sets of agent operands pushing types to supersets (type sets of argument of features 'call' and 'item')"
 
 	library: "Gobo Eiffel Tools Library"
-	copyright: "Copyright (c) 2004-2014, Eric Bezault and others"
+	copyright: "Copyright (c) 2004-2018, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -35,7 +35,7 @@ feature {NONE} -- Initialization
 			static_type := a_type
 			agent_type := an_agent_type
 			if a_type.is_expanded then
-				put_type (a_type)
+				put_type (a_type.primary_type)
 			end
 		ensure
 			static_type_set: static_type = a_type
@@ -50,7 +50,7 @@ feature -- Access
 
 feature -- Element change
 
-	put_type_from_type_set (a_type: ET_DYNAMIC_TYPE; a_type_set: ET_DYNAMIC_TYPE_SET; a_system: ET_DYNAMIC_SYSTEM)
+	put_type_from_type_set (a_type: ET_DYNAMIC_PRIMARY_TYPE; a_type_set: ET_DYNAMIC_TYPE_SET; a_system: ET_DYNAMIC_SYSTEM)
 			-- Add `a_type' coming from `a_type_set' to current target.
 		local
 			old_count: INTEGER
@@ -78,7 +78,7 @@ feature -- Element change
 						end
 					end
 				end
-			elseif a_system.current_system.is_ise and then not has_type (a_type) then
+			elseif a_system.system_processor.is_ise and then not has_type (a_type) then
 					-- ISE Eiffel does not type-check the tuple operand of Agent calls even at
 					-- execution time. It only checks whether the tuple has enough items and
 					-- these items are of the expected types, regardless of the type of the tuple

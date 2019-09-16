@@ -108,7 +108,7 @@ feature {NONE} -- Initialization
 
 				--| UI structure			
 			create box2
-			box2.set_padding (3)
+			box2.set_padding ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (3))
 
 			special_label_color := (create {EV_STOCK_COLORS}).blue
 
@@ -157,7 +157,7 @@ feature {NONE} -- Initialization
 			end
 			exception.remove_text
 				-- We set a minimum width to prevent the label from resizing the call stack.
-			exception.set_minimum_width (40)
+			exception.set_minimum_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (40))
 			exception.set_foreground_color (create {EV_COLOR}.make_with_8_bit_rgb (255, 0, 0))
 			exception.disable_edit
 
@@ -174,13 +174,13 @@ feature {NONE} -- Initialization
 ----| FIXME Jfiat: Use session to store/restore column widths
 			g.set_column_count_to (4)
 			g.column (Feature_column_index).set_title (Interface_names.t_Feature)
-			g.column (Feature_column_index).set_width (120)
+			g.column (Feature_column_index).set_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (120))
 			g.column (Position_column_index).set_title (" @") --Interface_names.t_Position)
-			g.column (Position_column_index).set_width (20)
+			g.column (Position_column_index).set_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (20))
 			g.column (Dtype_column_index).set_title (Interface_names.t_Dynamic_type)
-			g.column (Dtype_column_index).set_width (100)
+			g.column (Dtype_column_index).set_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (100))
 			g.column (Stype_column_index).set_title (Interface_names.t_Static_type)
-			g.column (Stype_column_index).set_width (100)
+			g.column (Stype_column_index).set_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (100))
 
 				--| Action/event on call stack grid
 			g.drop_actions.extend (agent on_element_drop)
@@ -537,7 +537,7 @@ feature {NONE} -- Internal Properties
 	execution_replay_level_limit: INTEGER
 			-- Maximal level limit
 
-	stack_data: ARRAY [CALL_STACK_ELEMENT]
+	stack_data: ARRAY [detachable CALL_STACK_ELEMENT]
 			-- Data associated to the `stack_grid' row's data
 
 	arrowed_level: INTEGER
@@ -1515,7 +1515,7 @@ feature {NONE} -- Stack grid implementation
 				copy_call_stack_cmd.enable_sensitive
 				from
 					stack.start
-					create stack_data.make (1, stack.count)
+					create stack_data.make_filled (Void, 1, stack.count)
 					g.insert_new_rows (stack.count, 1)
 					i := 1
 				until
@@ -1588,6 +1588,7 @@ feature {NONE} -- Stack grid implementation
 		require
 			a_row_not_void: a_row /= Void
 		local
+			i,
 			level: INTEGER
 			cse: CALL_STACK_ELEMENT
 			dc, oc: CLASS_C
@@ -1596,6 +1597,7 @@ feature {NONE} -- Stack grid implementation
 			l_feature_name: STRING_32
 			l_is_melted: BOOLEAN
 			l_has_rescue: BOOLEAN
+			l_is_class_feature: BOOLEAN
 			l_class_info: STRING
 			l_orig_class_info: STRING_GENERAL
 			l_same_name: BOOLEAN
@@ -1605,6 +1607,7 @@ feature {NONE} -- Stack grid implementation
 			glab: EV_GRID_LABEL_ITEM
 			glabp: EV_GRID_PIXMAPS_ON_RIGHT_LABEL_ITEM
 			app_exec: APPLICATION_EXECUTION
+			pixs: ARRAYED_LIST [EV_PIXMAP]
 		do
 			level := level_from_row (a_row)
 			cse := stack_data_at (level)
@@ -1671,6 +1674,10 @@ feature {NONE} -- Stack grid implementation
 					if l_is_melted then
 						l_tooltip.append_string (interface_names.l_compilation_equal_melted)
 					end
+					l_is_class_feature := e_cse.is_class_feature
+					if l_is_class_feature then
+						l_tooltip.append_string (interface_names.l_feature_is_class)
+					end
 
 					if
 						attached {CALL_STACK_ELEMENT_DOTNET} e_cse as dotnet_cse
@@ -1697,14 +1704,25 @@ feature {NONE} -- Stack grid implementation
 				end
 
 					--| Fill columns
-				if l_is_melted or l_has_rescue then
+				if l_is_melted or l_has_rescue or l_is_class_feature then
 					create glabp.make_with_text (l_feature_name)
-					glabp.set_pixmaps_on_right_count (2)
+					create pixs.make (3)
 					if l_is_melted then
-						glabp.put_pixmap_on_right (pixmaps.mini_pixmaps.callstack_is_melted_icon, 1)
+						pixs.force (pixmaps.mini_pixmaps.callstack_is_melted_icon)
+					end
+					if l_is_class_feature then
+						pixs.force (pixmaps.mini_pixmaps.callstack_is_non_object_call_icon)
 					end
 					if l_has_rescue then
-						glabp.put_pixmap_on_right (pixmaps.mini_pixmaps.callstack_has_rescue_icon, 2)
+						pixs.force (pixmaps.mini_pixmaps.callstack_has_rescue_icon)
+					end
+					i := 0
+					glabp.set_pixmaps_on_right_count (pixs.count)
+					across
+						pixs as ic
+					loop
+						i := i + 1
+						glabp.put_pixmap_on_right (ic.item, i)
 					end
 					glab := glabp
 				else
@@ -2437,7 +2455,7 @@ feature {NONE} -- Implementation, cosmetic
 
 
 ;note
-	copyright: "Copyright (c) 1984-2018, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

@@ -5,7 +5,7 @@ note
 		"Eiffel lists of actual generic parameters"
 
 	library: "Gobo Eiffel Tools Library"
-	copyright: "Copyright (c) 2016-2017, Eric Bezault and others"
+	copyright: "Copyright (c) 2016-2019, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -176,6 +176,23 @@ feature -- Status report
 			end
 		end
 
+	has_unqualified_anchored_type: BOOLEAN
+			-- Does one of current types contain an unqualified anchored type
+			-- (i.e. 'like Current' or 'like feature_name')?
+		local
+			i, nb: INTEGER
+		do
+			nb := count
+			from i := 1 until i > nb loop
+				if type (i).has_unqualified_anchored_type then
+					Result := True
+					i := nb + 1 -- Jump out of the loop.
+				else
+					i := i + 1
+				end
+			end
+		end
+
 	has_identifier_anchored_type: BOOLEAN
 			-- Does one of current types contain an identifier anchored type
 			-- (i.e. an anchored type other than 'like Current')?
@@ -328,10 +345,10 @@ feature -- Comparison
 
 feature -- Conformance
 
-	conforms_to_types (other: ET_ACTUAL_PARAMETERS; other_context, a_context: ET_TYPE_CONTEXT): BOOLEAN
+	conforms_to_types (other: ET_ACTUAL_PARAMETERS; other_context, a_context: ET_TYPE_CONTEXT; a_system_processor: ET_SYSTEM_PROCESSOR): BOOLEAN
 			-- Does current actual parameters appearing in `a_context' conform
 			-- to `other' actual parameters appearing in `other_context'?
-			-- (Note: 'current_system.ancestor_builder' is used on classes on
+			-- (Note: 'a_system_processor.ancestor_builder' is used on classes on
 			-- the classes whose ancestors need to be built in order to check
 			-- for conformance.)
 		require
@@ -340,6 +357,7 @@ feature -- Conformance
 			other_context_valid: other_context.is_valid_context
 			a_context_not_void: a_context /= Void
 			a_context_valid: a_context.is_valid_context
+			a_system_processor_not_void: a_system_processor /= Void
 		local
 			i, nb: INTEGER
 		do
@@ -352,7 +370,7 @@ feature -- Conformance
 				Result := True
 				nb := count
 				from i := 1 until i > nb loop
-					if not type (i).conforms_to_type (other.type (i), other_context, a_context) then
+					if not type (i).conforms_to_type (other.type (i), other_context, a_context, a_system_processor) then
 						Result := False
 						i := nb + 1 -- Jump out of the loop.
 					else
@@ -362,12 +380,12 @@ feature -- Conformance
 			end
 		end
 
-	agent_conforms_to_types (a_tuple_position: INTEGER; other: ET_ACTUAL_PARAMETERS; other_context, a_context: ET_TYPE_CONTEXT): BOOLEAN
+	agent_conforms_to_types (a_tuple_position: INTEGER; other: ET_ACTUAL_PARAMETERS; other_context, a_context: ET_TYPE_CONTEXT; a_system_processor: ET_SYSTEM_PROCESSOR): BOOLEAN
 			-- Does current actual parameters (of an Agent type) appearing in `a_context'
 			-- conform to `other' actual parameters appearing in `other_context'?
 			-- Use SmartEiffel agent type conformance semantics, where the conformance
 			-- of the Tuple actual generic parameter is checked in the reverse order.
-			-- (Note: 'current_system.ancestor_builder' is used on classes on
+			-- (Note: 'a_system_processor.ancestor_builder' is used on classes on
 			-- the classes whose ancestors need to be built in order to check
 			-- for conformance.)
 		require
@@ -376,6 +394,7 @@ feature -- Conformance
 			other_context_valid: other_context.is_valid_context
 			a_context_not_void: a_context /= Void
 			a_context_valid: a_context.is_valid_context
+			a_system_processor_not_void: a_system_processor /= Void
 		local
 			i, nb: INTEGER
 		do
@@ -390,14 +409,14 @@ feature -- Conformance
 				from i := 1 until i > nb loop
 					if i = a_tuple_position then
 							-- Reverse conformance for the argument parameter.
-						if not other.type (i).conforms_to_type (type (i), a_context, other_context) then
+						if not other.type (i).conforms_to_type (type (i), a_context, other_context, a_system_processor) then
 							Result := False
 							i := nb + 1 -- Jump out of the loop.
 						else
 							i := i + 1
 						end
 					else
-						if not type (i).conforms_to_type (other.type (i), other_context, a_context) then
+						if not type (i).conforms_to_type (other.type (i), other_context, a_context, a_system_processor) then
 							Result := False
 							i := nb + 1 -- Jump out of the loop.
 						else
@@ -408,10 +427,10 @@ feature -- Conformance
 			end
 		end
 
-	tuple_conforms_to_types (other: ET_ACTUAL_PARAMETERS; other_context, a_context: ET_TYPE_CONTEXT): BOOLEAN
+	tuple_conforms_to_types (other: ET_ACTUAL_PARAMETERS; other_context, a_context: ET_TYPE_CONTEXT; a_system_processor: ET_SYSTEM_PROCESSOR): BOOLEAN
 			-- Does current actual parameters (of a Tuple_type) appearing in `a_context'
 			-- conform to `other' actual parameters appearing in `other_context'?
-			-- (Note: 'current_system.ancestor_builder' is used on classes on
+			-- (Note: 'a_system_processor.ancestor_builder' is used on classes on
 			-- the classes whose ancestors need to be built in order to check
 			-- for conformance.)
 		require
@@ -420,6 +439,7 @@ feature -- Conformance
 			other_context_valid: other_context.is_valid_context
 			a_context_not_void: a_context /= Void
 			a_context_valid: a_context.is_valid_context
+			a_system_processor_not_void: a_system_processor /= Void
 		local
 			i, nb: INTEGER
 		do
@@ -430,7 +450,7 @@ feature -- Conformance
 				if nb <= count then
 					Result := True
 					from i := 1 until i > nb loop
-						if not type (i).conforms_to_type (other.type (i), other_context, a_context) then
+						if not type (i).conforms_to_type (other.type (i), other_context, a_context, a_system_processor) then
 							Result := False
 							i := nb + 1 -- Jump out of the loop.
 						else
@@ -496,17 +516,19 @@ feature -- Output
 			a_string_not_void: a_string /= Void
 		local
 			i, nb: INTEGER
-			a_type: ET_TYPE
 		do
 			a_string.append_character ('[')
 			nb := count
 			if nb >= 1 then
-				a_type := type (1)
-				a_type.append_to_string (a_string)
-				from i := 2 until i > nb loop
-					a_string.append_string (", ")
-					a_type := type (i)
-					a_type.append_to_string (a_string)
+				from i := 1 until i > nb loop
+					if i > 1 then
+						a_string.append_string (", ")
+					end
+					if attached actual_parameter (i).label as l_label then
+						a_string.append_string (l_label.lower_name)
+						a_string.append_string (": ")
+					end
+					type (i).append_to_string (a_string)
 					i := i + 1
 				end
 			end
@@ -533,6 +555,32 @@ feature -- Output
 					a_string.append_string (", ")
 					a_type := type (i)
 					a_type.append_unaliased_to_string (a_string)
+					i := i + 1
+				end
+			end
+			a_string.append_character (']')
+		end
+
+	append_runtime_name_to_string (a_string: STRING)
+			-- Append to `a_string' textual representation of unaliased
+			-- version of current actual parameters as returned by 'TYPE.runtime_name'.
+			-- An unaliased version if when aliased types such as INTEGER
+			-- are replaced by the associated types such as INTEGER_32.
+		require
+			a_string_not_void: a_string /= Void
+		local
+			i, nb: INTEGER
+			a_type: ET_TYPE
+		do
+			a_string.append_character ('[')
+			nb := count
+			if nb >= 1 then
+				a_type := type (1)
+				a_type.append_runtime_name_to_string (a_string)
+				from i := 2 until i > nb loop
+					a_string.append_string (", ")
+					a_type := type (i)
+					a_type.append_runtime_name_to_string (a_string)
 					i := i + 1
 				end
 			end

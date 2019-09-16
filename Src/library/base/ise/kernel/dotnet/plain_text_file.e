@@ -1,9 +1,7 @@
-note
+﻿note
 
-	description:
-		"Files viewed as persistent sequences of ASCII characters"
+	description: "Files viewed as persistent sequences of ASCII characters."
 	legal: "See notice at end of class."
-
 	status: "See notice at end of class."
 	date: "$Date$"
 	revision: "$Revision$"
@@ -24,7 +22,8 @@ create
 	make, make_with_path,
 	make_with_name, make_open_read, make_open_write, make_open_append,
 	make_open_read_write, make_create_read_write,
-	make_open_read_append
+	make_open_read_append,
+	make_open_temporary, make_open_temporary_with_prefix
 
 feature -- Status report
 
@@ -57,19 +56,21 @@ feature -- Output
 			end
 		end
 
-	put_string (s: STRING)
+	put_string (s: READABLE_STRING_8)
 			-- Write `s' at current position.
 		local
 			l_str: STRING
 		do
-			if s.count /= 0 then
+			if s.has ('%N') then
 				create l_str.make_from_string (s)
 				l_str.replace_substring_all (eiffel_newline, dotnet_newline)
 				Precursor (l_str)
+			else
+				Precursor (s)
 			end
 		end
 
-	putstring (s: STRING)
+	putstring (s: READABLE_STRING_8)
 			-- Write `s' at current position.
 		do
 			put_string (s)
@@ -126,20 +127,16 @@ feature -- Output
 	put_boolean, putbool (b: BOOLEAN)
 			-- Write ASCII value of `b' at current position.
 		do
-			if b then
-				put_string (true_string)
-			else
-				put_string (false_string)
-			end
+			put_string (if b then true_string else false_string end)
 		end
 
-	put_real, putreal (r: REAL_32)
+	put_real, putreal, put_real_32 (r: REAL_32)
 			-- Write ASCII value of `r' at current position.
 		do
 			put_string (r.out)
 		end
 
-	put_double, putdouble (d: REAL_64)
+	put_double, putdouble, put_real_64 (d: REAL_64)
 			-- Write ASCII value `d' at current position.
 		do
 			put_string (d.out)
@@ -242,7 +239,7 @@ feature -- Input
 			last_natural_8 := ctoi_convertor.parsed_natural_8
 		end
 
-	read_real, readreal
+	read_real, readreal, read_real_32
 			-- Read the ASCII representation of a new real
 			-- from file. Make result available in `last_real'.
 		do
@@ -250,7 +247,7 @@ feature -- Input
 			last_real := last_double.truncated_to_real
 		end
 
-	read_double, readdouble
+	read_double, readdouble, read_real_64
 			-- Read the ASCII representation of a new double
 			-- from file. Make result available in `last_double'.
 		do
@@ -382,7 +379,7 @@ invariant
 
 note
 	library:	"EiffelBase: Library of reusable components for Eiffel."
-	copyright:	"Copyright (c) 1984-2012, Eiffel Software and others"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software and others"
 	license:	"Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software
@@ -392,9 +389,4 @@ note
 			Customer support http://support.eiffel.com
 		]"
 
-
-
-end -- class PLAIN_TEXT_FILE
-
-
-
+end

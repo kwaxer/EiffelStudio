@@ -36,6 +36,8 @@ inherit
 
 	SHARED_GENERATION
 
+	SHARED_LOCALE
+
 create
 	make
 
@@ -259,8 +261,10 @@ feature -- Action
 				l_options := l_lace_class.options
 				if is_warning_generated then
 					parser.set_has_syntax_warning (l_options.is_warning_enabled (w_syntax))
+					parser.set_warning_as_error (l_options.is_warning_as_error)
 				else
 					parser.set_has_syntax_warning (False)
+					parser.set_warning_as_error (False)
 				end
 				inspect l_options.syntax.index
 				when {CONF_OPTION}.syntax_index_obsolete then
@@ -340,21 +344,21 @@ feature -- Action
 			old_syntactical_suppliers: like syntactical_suppliers
 		do
 				-- Check that routine classes have an expected number of formal generics.
-			if system.routine_class_id = class_id then
-				if not attached ast_b.generics as g or else g.count /= 1 then
-					Error_handler.insert_error (create {SPECIAL_ERROR}.make ({SPECIAL_CONST}.routine_case_1, Current))
+			if attached system.routine_class as i and then attached i.compiled_class as c and then c.class_id = class_id then
+				if attached ast_b.generics as g implies g.count /= 1 then
+					error_handler.insert_error (create {SPECIAL_ERROR}.make ({SPECIAL_CONST}.routine_case_1, Current))
 				end
-			elseif system.predicate_class_id = class_id then
-				if not attached ast_b.generics as g or else g.count /= 1 then
-					Error_handler.insert_error (create {SPECIAL_ERROR}.make ({SPECIAL_CONST}.predicate_case_1, Current))
+			elseif attached system.predicate_class as i and then attached i.compiled_class as c and then c.class_id = class_id then
+				if attached ast_b.generics as g implies g.count /= 1 then
+					error_handler.insert_error (create {SPECIAL_ERROR}.make ({SPECIAL_CONST}.predicate_case_1, Current))
 				end
-			elseif system.procedure_class_id = class_id then
-				if not attached ast_b.generics as g or else g.count /= 1 then
-					Error_handler.insert_error (create {SPECIAL_ERROR}.make ({SPECIAL_CONST}.procedure_case_1, Current))
+			elseif attached system.procedure_class as i and then attached i.compiled_class as c and then c.class_id = class_id then
+				if attached ast_b.generics as g implies g.count /= 1 then
+					error_handler.insert_error (create {SPECIAL_ERROR}.make ({SPECIAL_CONST}.procedure_case_1, Current))
 				end
-			elseif system.function_class_id = class_id then
-				if not attached ast_b.generics as g or else g.count /= 2 then
-					Error_handler.insert_error (create {SPECIAL_ERROR}.make ({SPECIAL_CONST}.function_case_1, Current))
+			elseif attached system.function_class as i and then attached i.compiled_class as c and then c.class_id = class_id then
+				if attached ast_b.generics as g implies g.count /= 2 then
+					error_handler.insert_error (create {SPECIAL_ERROR}.make ({SPECIAL_CONST}.function_case_1, Current))
 				end
 			end
 				-- Check suppliers of parsed class represented by `ast_b'.
@@ -1744,7 +1748,10 @@ feature {NONE} -- Class initialization
 			Inst_context.set_group (cluster)
 			across generics as l_formal_generic loop
 				if is_expanded and then l_formal_generic.item.constraints.count > 1 then
-					Error_handler.insert_error (create {NOT_SUPPORTED}.make ("Multiple constraints are not permitted in an expanded generic class"))
+					Error_handler.insert_error (create {NOT_SUPPORTED}.make_from_string
+						(locale.translation_in_context ("Multiple constraints are not permitted in an expanded generic class", "compiler.error"),
+						ast_context,
+						l_formal_generic.item.start_location))
 				else
 					across l_formal_generic.item.constraints as l_constraint loop
 						l_constraint_type := l_constraint.item.type
@@ -2169,8 +2176,8 @@ invariant
 	inline_agent_table_not_void: inline_agent_table /= Void
 
 note
-	ca_ignore: "CA033", "CA033 — very long class"
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	ca_ignore: "CA033", "CA033: very long class"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

@@ -332,27 +332,21 @@ feature {NONE} -- Visitors
 
 	process_attribute_b (a_node: ATTRIBUTE_B)
 			-- Process `a_node'.
-		local
-			f: FEATURE_B
 		do
-			f := a_node.wrapper
-			if f /= Void then
+			if attached a_node.wrapper as f then
 				process_feature_b (f)
-			else
-				if a_node.context_type.is_basic then
-						-- Access to `item' from basic types.
-						-- Nothing to be done since the right value is already on the stack.
+			elseif not a_node.context_type.is_basic then
+					-- Access to `item' from non-basic types
+					-- when the right value is not yet on the stack.
+				if a_node.is_first then
+					ba.append (bc_current)
+					ba.append (bc_attribute)
 				else
-					if a_node.is_first then
-						ba.append (bc_current)
-						ba.append (bc_attribute)
-					else
-						ba.append (bc_attribute_inv)
-						ba.append_raw_string (a_node.attribute_name)
-					end
-					ba.append_integer (a_node.routine_id)
-					ba.append_natural_32 (context.real_type (a_node.type).sk_value (context.context_class_type.type))
+					ba.append (bc_attribute_inv)
+					ba.append_raw_string (a_node.attribute_name)
 				end
+				ba.append_integer (a_node.routine_id)
+				ba.append_natural_32 (context.real_type (a_node.type).sk_value (context.context_class_type.type))
 			end
 		end
 
@@ -855,6 +849,7 @@ feature {NONE} -- Visitors
 			l_pos: INTEGER
 			l_is_in_creation_call: like is_in_creation_call
 			l_is_active_region: like is_active_region
+			creation_expression: CREATION_EXPR_B
 		do
 			l_is_in_creation_call := is_in_creation_call
 			is_in_creation_call := False
@@ -916,8 +911,16 @@ feature {NONE} -- Visitors
 				end
 			end
 
-			if a_node.is_static_call then
-				ba.append (bc_current)
+			if attached a_node.static_class_type as p then
+				if a_node.is_class_target_needed then
+						-- Generate an empty object to be used as a target of the call.
+					create creation_expression
+					creation_expression.set_info (p.create_info)
+					creation_expression.set_type (p)
+					process_creation_expr_b (creation_expression)
+				else
+					ba.append (bc_current)
+				end
 				ba.append (bc_extern)
 				ba.append_integer (a_node.routine_id)
 				make_precursor_byte_code (a_node)
@@ -1739,7 +1742,16 @@ feature {NONE} -- Visitors
 
 			make_expression_byte_code_for_type (a_node.expression, l_target_type)
 
-			if l_target_type.is_none then
+			if
+					-- Assignment on something of type NONE always fails.
+				l_target_type.is_none or else
+					-- Assignment to an expanded variable.
+				l_target_type.is_expanded and then
+					-- Assigning Void to expanded.
+				(l_source_type.is_none or else
+					-- Non-conforming expanded types.
+				l_source_type.is_expanded and then not l_source_type.conform_to (context.associated_class, l_target_type))
+			then
 					-- Remove expression value because it is not used.
 				ba.append (bc_pop)
 				ba.append_uint32_integer (1)
@@ -1747,30 +1759,21 @@ feature {NONE} -- Visitors
 				ba.append (bc_bool)
 				ba.append_boolean (False)
 			elseif l_target_type.is_expanded and then l_source_type.is_expanded then
-					-- NOOP if classes are different or normal assignment otherwise.
-				if
-					attached {CL_TYPE_A} l_source_type as l_source_class_type and then
-					attached {CL_TYPE_A} l_target_type as l_target_class_type and then
-					l_target_class_type.class_id = l_source_class_type.class_id
-				then
-						-- Do normal assignment.
-					if l_target_type.is_basic then
-						ba.append (a_node.target.assign_code)
-					else
-						ba.append (a_node.target.expanded_assign_code)
-					end
-					melted_assignment_generator.generate_assignment (ba, a_node.target)
-						-- Types conform.
-					ba.append (bc_bool)
-					ba.append_boolean (True)
-				else
-						-- Remove expression value because it is not used.
-					ba.append (bc_pop)
-					ba.append_uint32_integer (1)
-						-- Types do not conform.
-					ba.append (bc_bool)
-					ba.append_boolean (False)
+					-- Do normal assignment.
+				check
+					from_conformance_test_of_expanded_types:
+						l_source_type.conform_to (context.associated_class, l_target_type)
 				end
+				ba.append
+					(if l_target_type.is_basic then
+						a_node.target.assign_code
+					else
+						a_node.target.expanded_assign_code
+					end)
+				melted_assignment_generator.generate_assignment (ba, a_node.target)
+					-- Types conform.
+				ba.append (bc_bool)
+				ba.append_boolean (True)
 			else
 					-- Target is a reference, source is a reference, or both
 				if system.is_scoop and then not l_target_type.is_separate and then l_source_type.is_separate then
@@ -1803,9 +1806,17 @@ feature {NONE} -- Visitors
 		do
 			l_is_str32 := a_node.is_string_32
 			if l_is_str32 then
-				ba.append (bc_once_string32)
+				if a_node.is_immutable then
+					ba.append (bc_once_immstring32)
+				else
+					ba.append (bc_once_string32)
+				end
 			else
-				ba.append (bc_once_string)
+				if a_node.is_immutable then
+					ba.append (Bc_once_immstring8)
+				else
+					ba.append (bc_once_string)
+				end
 			end
 			ba.append_integer (a_node.body_index - 1)
 			ba.append_integer (a_node.number - 1)
@@ -2005,13 +2016,21 @@ feature {NONE} -- Visitors
 		do
 			if a_node.is_string_32 then
 				l_value_32 := a_node.value_32
-				ba.append (Bc_string32)
+				if a_node.is_immutable then
+					ba.append (Bc_immstring32)
+				else
+					ba.append (Bc_string32)
+				end
 					-- Bytes to read
 				ba.append_integer (l_value_32.count * 4)
 				ba.append_raw_string_32 (l_value_32)
 			else
 				l_value := a_node.value_8
-				ba.append (Bc_string)
+				if a_node.is_immutable then
+					ba.append (Bc_immstring8)
+				else
+					ba.append (Bc_string)
+				end
 					-- Bytes to read
 				ba.append_integer (l_value.count)
 				ba.append_raw_string (l_value)
@@ -2679,7 +2698,7 @@ feature {NONE} -- SCOOP
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "A project cluster."
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
@@ -12,7 +12,6 @@ inherit
 	CONF_PHYSICAL_GROUP
 		redefine
 			make,
-			options,
 			is_group_equivalent,
 			process,
 			class_by_name,
@@ -166,6 +165,38 @@ feature -- Access queries
 			Result := l_result
 		end
 
+	adapted_options: CONF_OPTION
+			-- <Precursor>
+		local
+			l_local: CONF_OPTION
+		do
+				-- Get local options
+			if attached forced_options as o then
+				l_local := o.twin
+			elseif attached internal_options as o then
+				l_local := o.twin
+			else
+				create l_local
+			end
+			l_local.merge (if attached parent as p then p.adapted_options else target.adapted_options end)
+
+				-- if used as library, get options from application level if the library is defined there
+			if
+				is_used_in_library and then
+				attached target.system.application_target_library as l
+			then
+				Result := l.adapted_options
+			end
+
+			if attached Result then
+				Result.merge (l_local)
+					-- Need to set local namespace, because local namespaces cannot be merged for libraries
+				Result.set_local_namespace (l_local.local_namespace)
+			else
+				Result := l_local
+			end
+		end
+
 	class_options: like internal_class_options
 			-- Options for classes.
 		local
@@ -199,6 +230,44 @@ feature -- Access queries
 							Result := l_class_options.twin
 						end
 					end
+				end
+			end
+		end
+
+	adapted_class_options: like internal_class_options
+			-- Options for classes.
+		do
+				-- Get local options
+			if
+				attached parent as p and then
+				attached p.adapted_class_options as o
+			then
+				Result := o.twin
+			end
+			if attached forced_class_options as o then
+				if Result /= Void then
+					Result.merge (o)
+				else
+					Result := o.twin
+				end
+			elseif attached internal_class_options as o then
+				if Result /= Void then
+					Result.merge (o)
+				else
+					Result := o.twin
+				end
+			end
+
+				-- if used as library, get options from application level if the library is defined there
+			if
+				is_used_in_library and then
+				attached target.system.application_target_library as l and then
+				attached l.adapted_class_options as o
+			then
+				if Result /= Void then
+					Result.merge (o)
+				else
+					Result := o.twin
 				end
 			end
 		end
@@ -486,6 +555,30 @@ feature {CONF_ACCESS} -- Update, stored in configuration file
 			added: el_internal_dependencies.has (a_group)
 		end
 
+	add_dependency_name (a_group_name: like {CONF_GROUP}.name)
+			-- Add dependency on group named `a_group_name`.
+		require
+			a_group_not_void: a_group_name /= Void
+		local
+			l_dep_names: like dependency_names
+		do
+			l_dep_names := dependency_names
+			if l_dep_names = Void then
+				create l_dep_names.make (0)
+				dependency_names := l_dep_names
+			end
+			l_dep_names.force (a_group_name)
+		ensure
+			dependency_names_set: attached dependency_names as el_depnames
+			added: el_depnames.has (a_group_name)
+		end
+
+	reset_dependency_names
+			-- Reset group dependency names.
+		do
+			dependency_names := Void
+		end
+
 	add_file_rule (a_file_rule: CONF_FILE_RULE)
 			-- Add `a_file_rule'.
 		require
@@ -566,6 +659,10 @@ feature {CONF_ACCESS} -- Implementation, attributes stored in configuration file
 	internal_dependencies: detachable like dependencies
 			-- Dependencies to other groups of this cluster itself.
 
+	dependency_names: detachable ARRAYED_LIST [like {CONF_GROUP}.name]
+			-- Dependencies to other groups of this cluster itself.
+			-- It will be expanded as `dependencies`.
+
 	internal_file_rule: like file_rule
 			-- Rules for files to be included or excluded of this cluster itself.
 
@@ -586,7 +683,7 @@ invariant
 	parent_child_relationship: attached parent as p implies (attached p.children as p_children and then p_children.has (Current))
 
 note
-	copyright: "Copyright (c) 1984-2018, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

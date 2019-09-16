@@ -42,31 +42,49 @@ WDOCSMOD.replaceTagName = function(elt, replaceWith) {
         }
         return $(tags);
     };
+WDOCSMOD.prepareCode = function(elt) {
+	/* Also support <eiffel> and <e> */
+	$(elt).find('eiffel,e').each(function(i, block) {
+		var l_code = WDOCSMOD.replaceTagName($(block), 'code');
+		l_code.attr("lang", "eiffel");
+	});
 
-if (typeof $ !== "undefined") {
-
-	$(document).ready(function() {
-		$("#wdocs-tree.menu li").each(function() { WDOCSMOD.prepareTreeMenuItem($(this));});
-
-		/* Prepare <code> for prettyPrint */
-		$('code').each(function(i, block) {
-			var codelang = $(block).attr("lang");
-			if (codelang !== undefined) {
-				$(block).addClass("lang-"+codelang);
+	/* Prepare <code> for prettyPrint */
+	$(elt).find('code').each(function(i, block) {
+		var codelang = $(block).attr("lang");
+		if (codelang) {
+			//console.log ("codelang=" + codelang + " len=" + codelang.length);
+		} else {
+			if ($(block).hasClass("inline")) {
+				// Uncomment next line, to render inline code by default as Eiffel code.
+				//codelang = 'eiffel';
 			} else {
-				$(block).addClass("lang-eiffel");
+				// code is rendered by default as Eiffel code.
+				codelang = 'eiffel';
 			}
-			$(block).addClass("prettyprint");
-		});
-		/* Also support <eiffel> and <e> */
-		$('eiffel,e').each(function(i, block) {
-			var elt = WDOCSMOD.replaceTagName($(block), 'code');
-			elt.addClass("lang-eiffel");
-			elt.addClass("prettyprint");
-		});
-
-		//prettyPrint();
-
 		}
-	)
+		if (codelang == "text" || codelang == "none") { codelang = null; }
+		else if (codelang == "shell") { codelang = "sh"; }
+		else if (codelang == "e") { codelang = "eiffel"; }
+
+		if (codelang) { // !== undefined && codelang.length > 0) {
+			$(block).removeAttr("lang");
+			$(block).addClass("prettyprint");
+			$(block).addClass("lang-" + codelang);
+		}
+	});
+	/* if already loaded, call right away */
+	if (typeof PR.prettyPrint === 'function') {
+		PR.prettyPrint();
+	}
 }
+
+$(document).ready(function() {
+	$("#wdocs-tree.menu li").each(function() { WDOCSMOD.prepareTreeMenuItem($(this));});
+
+	/* Prepare <code> for prettyPrint */
+	WDOCSMOD.prepareCode($(document.body));
+
+	}
+)
+

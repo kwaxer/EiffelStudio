@@ -49,9 +49,7 @@ feature -- Execution
 		local
 			sorted_class_names: SORTED_TWO_WAY_LIST [READABLE_STRING_GENERAL];
 			classes: STRING_TABLE [CONF_CLASS];
-			a_classi: CLASS_I;
 			a_class: CLASS_C;
-			l_precompile: CONF_PRECOMPILE
 		do
 			create sorted_class_names.make;
 			classes := a_group.classes;
@@ -66,8 +64,7 @@ feature -- Execution
 			sorted_class_names.sort;
 			text_formatter.add ("Cluster: ");
 			text_formatter.add_group (a_group, a_group.name);
-			l_precompile ?= a_group
-			if l_precompile /= Void then
+			if attached {CONF_PRECOMPILE} a_group then
 				text_formatter.add (" (Precompiled)")
 			end
 			text_formatter.add_new_line;
@@ -76,8 +73,7 @@ feature -- Execution
 			until
 				sorted_class_names.after
 			loop
-				a_classi ?= classes.item (sorted_class_names.item)
-				if a_classi /= Void then
+				if attached {CLASS_I} classes.item (sorted_class_names.item) as a_classi then
 					text_formatter.add_indent;
 					a_class := a_classi.compiled_class;
 					if a_class /= Void then
@@ -115,10 +111,9 @@ feature -- Execution
 						index_tag_32 := index.tag.name_32
 						if
 							index_tag_32 /= Void and then
-							attached index_tag_32.as_string_8 as index_tag and then
-							(not index_tag.is_equal ("status") and
-							not index_tag.is_equal ("date") and
-							not index_tag.is_equal ("revision"))
+							(not index_tag_32.same_string_general ("status") and
+							not index_tag_32.same_string_general ("date") and
+							not index_tag_32.same_string_general ("revision"))
 						then
 							a_text_formatter.add_new_line
 							a_text_formatter.add_indent
@@ -152,10 +147,9 @@ feature -- Execution
 						index_tag_32 := index.tag.name_32
 						if
 							index_tag_32 /= Void and then
-							attached index_tag_32.as_string_8 as index_tag and then
-							(not index_tag.is_equal ("status") and
-							not index_tag.is_equal ("date") and
-							not index_tag.is_equal ("revision"))
+							(not index_tag_32.same_string ("status") and
+							not index_tag_32.same_string ("date") and
+							not index_tag_32.same_string ("revision"))
 						then
 							a_text_formatter.add_new_line
 							a_text_formatter.add_indent
@@ -182,7 +176,7 @@ feature -- Execution
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2013, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

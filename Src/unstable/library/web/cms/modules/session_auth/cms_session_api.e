@@ -25,18 +25,13 @@ feature {NONE} -- Initialization
 			make (a_api)
 
 				-- Initialize session related settings.
-			s := a_api.setup.string_8_item ("auth.session.token")
+			s := a_api.setup.site_auth_token ("session")
 			if s = Void then
 				s := a_api.setup.site_id + default_session_token_suffix
 			end
 			create session_token.make_from_string (s)
 
-			s := a_api.setup.string_8_item ("auth.session.max_age")
-			if s /= Void and then s.is_integer then
-				session_max_age := s.to_integer
-			else
-				session_max_age := 86400 --| one day: 24(h) *60(min) *60(sec)
-			end
+			session_max_age := a_api.setup.site_auth_max_age ("session")
 		ensure
 			session_auth_storage_set:  session_auth_storage = a_session_auth_storage
 		end
@@ -89,6 +84,7 @@ feature -- Basic operation
 		local
 			l_token: STRING
 			l_cookie: WSF_COOKIE
+			dt: DATE_TIME
 		do
 			l_token := new_session_token
 			if has_user_token (a_user) then
@@ -98,6 +94,17 @@ feature -- Basic operation
 			end
 			create l_cookie.make (session_token, l_token)
 			l_cookie.set_max_age (session_max_age)
+			if l_cookie.max_age < 0 then
+				l_cookie.unset_expiration
+			else
+				if l_cookie.max_age = 0 then
+					create dt.make_from_epoch (0)
+				else
+					create dt.make_now_utc
+					dt.second_add (l_cookie.max_age)
+				end
+				l_cookie.set_expiration_date (dt)
+			end
 			l_cookie.set_path ("/")
 			res.add_cookie (l_cookie)
 			cms_api.set_user (a_user)

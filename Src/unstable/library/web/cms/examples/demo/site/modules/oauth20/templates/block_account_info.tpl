@@ -4,10 +4,10 @@
     	<div>
     		{foreach item="consumer" from="$oauth_associated"}
     			<div>
-    				<form method="post" action="{$site_url/}account/oauth-un-associate">
-						<input type="hidden" name="consumer" value="{$consumer/}"/>
+    				<form method="post" action="{$site_url/}account/auth/oauth-un-associate">
+						<input type="hidden" name="consumer" value="{htmlentities}{$consumer/}{/htmlentities}"/>
           				<div>
-                			<button type="submit">Unlink {$consumer/}</button>
+                			<button type="submit">Unlink {htmlentities}{$consumer/}{/htmlentities}</button>
               			</div>
           			</form>	
 			   	</div>
@@ -19,11 +19,10 @@
     	<div>
     		{foreach item="consumer" from="$oauth_not_associated"}
     			<div>
-    				<form method="post" action="{$site_url/}account/oauth-associate">
-						<input type="hidden" name="consumer" value="{$consumer/}"/>
+    				<form method="post" action="{$site_url/}account/auth/oauth-associate">
+						<input type="hidden" name="consumer" value="{htmlentities}{$consumer/}{/htmlentities}"/>
           				<div>
-          				  <input type="email" id="email" name="email"  value="{$email/}"  required/>	
-                		  <button type="submit">Link with {$consumer/}</button>
+                		  <button type="submit">Link with {htmlentities}{$consumer/}{/htmlentities}</button>
               			</div>  
 					</form>	
 			   	</div>

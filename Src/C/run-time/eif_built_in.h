@@ -2,7 +2,7 @@
 	description: "Declarations for `built_in' externals."
 	date:		"$Date$"
 	revision:	"$Revision$"
-	copyright:	"Copyright (c) 1985-2018, Eiffel Software."
+	copyright:	"Copyright (c) 1985-2019, Eiffel Software."
 	license:	"GPL version 2 see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"Commercial license is available at http://www.eiffel.com/licensing"
 	copying: "[
@@ -49,6 +49,7 @@
 #include "eif_object_id.h"
 #include "eif_traverse.h"
 #include "eif_macros.h"
+#include <math.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -88,7 +89,15 @@ extern "C" {
 #define eif_builtin_IDENTIFIED_ROUTINES_eif_current_object_id(object)	eif_reference_id(object)
 #define eif_builtin_IDENTIFIED_ROUTINES_eif_is_object_id_of_current(object,id) EIF_TEST(eif_id_object(id) == object)
 
-#define eif_builtin_REFLECTOR_c_set_dynamic_type(obj,enc_ftype)		eif_set_dynamic_type(obj,enc_ftype)
+/* REFLECTOR class */
+#define eif_builtin_REFLECTOR_c_set_dynamic_type(obj,enc_ftype)			eif_set_dynamic_type(obj,enc_ftype)
+#define eif_builtin_REFLECTOR_c_new_type_instance_of(type_id)			eif_type_malloc(eif_decoded_type(type_id), 0)
+#define eif_builtin_REFLECTOR_c_new_tuple_instance_of(type_id)			RTLNT(eif_decoded_type(type_id).id)
+#define eif_builtin_REFLECTOR_c_new_instance_of(type_id)			RTLNALIVE(eif_decoded_type(type_id).id)
+#define eif_builtin_REFLECTOR_field_count_of_type(type_id)			ei_count_field_of_type(type_id)
+#define eif_builtin_REFLECTOR_is_tuple_type(type_id)				eif_is_tuple_type(type_id)     
+#define eif_builtin_REFLECTOR_is_special_type(type_id)				eif_is_special_type(type_id) 
+#define eif_builtin_REFLECTOR_is_special_any_type(type_id)			eif_special_any_type(type_id)
 
 /* ISE_RUNTIME class */
 /* Define helper to avoid code duplication. */
@@ -193,8 +202,21 @@ rt_private rt_inline EIF_BOOLEAN rt_is_special_copy_semantics_item (EIF_INTEGER_
 #define eif_builtin_ISE_RUNTIME_set_integer_64_field_at(field_offs,obj,offs,val)	*(EIF_INTEGER_64 *) (eif_obj_at(obj,offs) + field_offs) = (EIF_INTEGER_64) (val)
 #define eif_builtin_ISE_RUNTIME_set_real_32_field_at(field_offs,obj,offs,val)		*(EIF_REAL_32 *) (eif_obj_at(obj,offs) + field_offs) = (EIF_REAL_32) (val)
 #define eif_builtin_ISE_RUNTIME_set_real_64_field_at(field_offs,obj,offs,val)		*(EIF_REAL_64 *) (eif_obj_at(obj,offs) + field_offs) = (EIF_REAL_64) (val)
-#define eif_builtin_ISE_RUNTIME_set_pointer_field_at(field_offs,obj,offs,val)			*(EIF_POINTER *) (eif_obj_at(obj,offs) + field_offs) = (EIF_POINTER) (val)
+#define eif_builtin_ISE_RUNTIME_set_pointer_field_at(field_offs,obj,offs,val)		*(EIF_POINTER *) (eif_obj_at(obj,offs) + field_offs) = (EIF_POINTER) (val)
 
+#define eif_builtin_ISE_RUNTIME_unlock_marking							eif_unlock_marking()
+#define eif_builtin_ISE_RUNTIME_eif_gen_param_id(a_type_id, i)			eif_gen_param_id(a_type_id, i)
+#define eif_builtin_ISE_RUNTIME_generic_parameter_count(a_type_id)		eif_gen_count_with_dftype(eif_decoded_type(a_type_id).id)
+#define eif_builtin_ISE_RUNTIME_field_offset_of_type(i,a_type_id)		ei_offset_of_type(i,a_type_id)
+#define eif_builtin_ISE_RUNTIME_field_count_of_type(a_type_id)			ei_count_field_of_type(a_type_id)
+
+#define eif_builtin_ISE_RUNTIME_persistent_field_count_of_type(a_type_id)	(System(To_dtype(eif_decoded_type(a_type_id).id)).cn_persistent_nbattr)
+#define eif_builtin_ISE_RUNTIME_is_field_expanded_of_type(i,a_type_id)		((System(To_dtype(eif_decoded_type(a_type_id).id)).cn_types[i - 1] & SK_HEAD) == SK_EXP)
+#define eif_builtin_ISE_RUNTIME_is_field_transient_of_type(i,a_type_id)		EIF_IS_TRANSIENT_ATTRIBUTE(System(To_dtype(eif_decoded_type(a_type_id).id)), i - 1)
+#define eif_builtin_ISE_RUNTIME_attached_type(a_type_id)					eif_attached_type(a_type_id)
+#define eif_builtin_ISE_RUNTIME_detachable_type(a_type_id)					eif_non_attached_type(a_type_id)
+#define eif_builtin_ISE_RUNTIME_is_attached_type(a_type_id)					eif_is_attached_type(a_type_id)
+#define eif_builtin_ISE_RUNTIME_type_conforms_to(a_type_id_1, a_type_id_2)	eif_gen_conf(a_type_id_1, a_type_id_2)
 
 /* MEMORY class */
 #define eif_builtin_MEMORY_free(obj)					eif_mem_free(obj)
@@ -226,13 +248,27 @@ rt_private rt_inline EIF_BOOLEAN rt_is_special_copy_semantics_item (EIF_INTEGER_
 #define eif_builtin_PLATFORM_double_bytes 				sizeof(EIF_REAL_64)
 #define eif_builtin_PLATFORM_pointer_bytes 				sizeof(EIF_POINTER)
 
-#define eif_builtin_REAL_32_REF_nan						eif_real_32_nan
+#define eif_builtin_REAL_32_REF_nan				eif_real_32_nan
 #define eif_builtin_REAL_32_REF_negative_infinity		eif_real_32_negative_infinity
 #define eif_builtin_REAL_32_REF_positive_infinity		eif_real_32_positive_infinity
+#define eif_builtin_REAL_32_ieee_is_equal(x,y)			(*(EIF_REAL_32 *)(x) == (y))
+#define eif_builtin_REAL_32_ieee_is_greater(x,y)		isgreater(*(EIF_REAL_32 *)(x),(y))
+#define eif_builtin_REAL_32_ieee_is_greater_equal(x,y)		isgreaterequal(*(EIF_REAL_32 *)(x),(y))
+#define eif_builtin_REAL_32_ieee_is_less(x,y)			isless(*(EIF_REAL_32 *)(x),(y))
+#define eif_builtin_REAL_32_ieee_is_less_equal(x,y)		islessequal(*(EIF_REAL_32 *)(x),(y))
+#define eif_builtin_REAL_32_ieee_maximum_number(x,y)		fmaxf(*(EIF_REAL_32 *)(x),(y))
+#define eif_builtin_REAL_32_ieee_minimum_number(x,y)		fminf(*(EIF_REAL_32 *)(x),(y))
 
-#define eif_builtin_REAL_64_REF_nan						eif_real_64_nan
+#define eif_builtin_REAL_64_REF_nan				eif_real_64_nan
 #define eif_builtin_REAL_64_REF_negative_infinity		eif_real_64_negative_infinity
 #define eif_builtin_REAL_64_REF_positive_infinity		eif_real_64_positive_infinity
+#define eif_builtin_REAL_64_ieee_is_equal(x,y)			(*(EIF_REAL_64 *)(x) == (y))
+#define eif_builtin_REAL_64_ieee_is_greater(x,y)		isgreater(*(EIF_REAL_64 *)(x),(y))
+#define eif_builtin_REAL_64_ieee_is_greater_equal(x,y)		isgreaterequal(*(EIF_REAL_64 *)(x),(y))
+#define eif_builtin_REAL_64_ieee_is_less(x,y)			isless(*(EIF_REAL_64 *)(x),(y))
+#define eif_builtin_REAL_64_ieee_is_less_equal(x,y)		islessequal(*(EIF_REAL_64 *)(x),(y))
+#define eif_builtin_REAL_64_ieee_maximum_number(x,y)		fmax(*(EIF_REAL_64 *)(x),(y))
+#define eif_builtin_REAL_64_ieee_minimum_number(x,y)		fmin(*(EIF_REAL_64 *)(x),(y))
 
 /* SPECIAL class */
 #define eif_builtin_SPECIAL_aliased_resized_area(area, n)	arycpy (area, n, RT_SPECIAL_COUNT (area))
@@ -302,6 +338,10 @@ rt_private rt_inline EIF_BOOLEAN rt_is_special_copy_semantics_item (EIF_INTEGER_
 #define eif_builtin_EQA_EXTERNALS_override_byte_code_of_body(body_id, pattern_id, byte_code, length)
 #endif
 
+
+/*REFLECTED_COPY_SEMANTICS_OBJECT class*/
+#define eif_builtin_REFLECTED_COPY_SEMANTICS_OBJECT_object_from_address(ptr)	(EIF_REFERENCE) ptr
+#define eif_builtin_REFLECTED_COPY_SEMANTICS_OBJECT_dereference(ptr, offset)	*(EIF_REFERENCE *) eif_obj_at(ptr, offset)
 
 #ifdef __cplusplus
 }

@@ -2,7 +2,6 @@ note
 	description: "Object that represents a target domain"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
-	author: ""
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -15,11 +14,9 @@ inherit
 			copy,
 			is_equal
 		redefine
-			content,
 			item_type,
 			prepare_before_new_domain_generation,
 			cleanup_after_new_domain_generation,
-			domain_generator,
 			is_target_domain,
 			clear_cache
 		end
@@ -134,7 +131,6 @@ feature{QL_CRITERION} -- Implementation for default criterion domain
 			l_class_table: like class_table
 			l_conf_group: CONF_GROUP
 			l_found: BOOLEAN
-			l_library: CONF_LIBRARY
 			l_used_in_libraries: LIST [CONF_LIBRARY]
 		do
 			l_cursor := cursor
@@ -156,8 +152,10 @@ feature{QL_CRITERION} -- Implementation for default criterion domain
 						l_conf_group := l_groups.item_for_iteration
 						if l_conf_group.is_library then
 							l_used_in_libraries := a_class.group.target.system.used_in_libraries
-							if l_used_in_libraries /= Void then
-								l_library ?= l_conf_group
+							if
+								l_used_in_libraries /= Void and then
+								attached {CONF_LIBRARY} l_conf_group as l_library
+							then
 								l_found := l_used_in_libraries.has (l_library)
 							else
 								l_found := False
@@ -228,7 +226,7 @@ feature{NONE} -- Type ancher
 			-- Anchor type for items in current domain
 
 note
-	copyright: "Copyright (c) 1984-2013, Eiffel Software"
+	copyright: "Copyright (c) 1984-2018, Eiffel Software"
 	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[
@@ -258,7 +256,5 @@ note
 			Website http://www.eiffel.com
 			Customer support http://support.eiffel.com
 		]"
-
-
 
 end

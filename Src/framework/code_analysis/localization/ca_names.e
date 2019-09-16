@@ -1,6 +1,7 @@
 ﻿note
 	description: "Name strings for the Code Analyzer."
 	author: "Stefan Zurfluh"
+	revised_by: "Alexander Kogtenkov"
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -73,7 +74,7 @@ feature -- Rules
 		do Result := translation_in_context ("Change to comparison with {REAL}.is_nan", once "code_analyzer") end
 
 	useless_contract_title: STRING_32
-		do Result := translation_in_context ("Useless contract with void-safety", once "code_analyzer") end
+		do Result := translation_in_context ("Useless contract with void safety", once "code_analyzer") end
 
 	useless_contract_fix: STRING_32
 		do Result := translation_in_context ("Remove the useless contract", once "code_analyzer") end
@@ -746,7 +747,7 @@ feature -- Preferences
 			-- A namespace used for translations.
 
 	preferences_window_title: STRING_32
-		do Result := translation_in_context ("Eiffel Inspector Preferences", once "code_analysis.preference") end
+		do Result := translation_in_context ("Code Analyzer Preferences", once "code_analysis.preference") end
 
 feature -- GUI
 
@@ -812,7 +813,7 @@ feature -- GUI
 		do Result := translation_in_context ("Go to next rule violation", once "code_analyzer.toolbar.item.tooltip") end
 
 	options_tooltip: STRING_32
-		do Result := translation_in_context ("Eiffel Inspector options", once "code_analyzer.toolbar.item.tooltip") end
+		do Result := translation_in_context ("Code Analyzer options", once "code_analyzer.toolbar.item.tooltip") end
 
 	description_column: STRING_32
 		do Result := translation_in_context ("Description", once "code_analyzer.column") end

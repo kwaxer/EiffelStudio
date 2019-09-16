@@ -16,7 +16,9 @@ inherit
 	JSON_VALUE
 		redefine
 			is_equal,
-			is_string
+			is_string,
+			same_string,
+			same_caseless_string
 		end
 
 create
@@ -54,6 +56,8 @@ feature {NONE} -- Initialization
 		do
 			if attached {READABLE_STRING_8} s as s8 then
 				make_from_string (s8)
+			elseif attached {READABLE_STRING_32} s as s32 then
+				make_from_string_32 (s32)
 			else
 				make_from_string_32 (s.as_string_32)
 			end
@@ -64,7 +68,7 @@ feature {NONE} -- Initialization
 		require
 			a_escaped_string_not_void: a_escaped_string /= Void
 		do
-			item := a_escaped_string
+			item := a_escaped_string.to_string_8
 		end
 
 	make_with_escaped_json (a_escaped_string: READABLE_STRING_8)
@@ -106,12 +110,24 @@ feature {NONE} -- Initialization
 feature -- Access
 
 	item: STRING
-			-- Contents with escaped entities if any
+			-- JSON+UTF-8 encoded content.
 
 feature -- Status report			
 
 	is_string: BOOLEAN = True
 			-- <Precursor>
+
+	same_string (a_string: READABLE_STRING_GENERAL): BOOLEAN
+			-- Current value is a string value, and same content as `a_string`?
+		do
+			Result := unescaped_string_32.same_string_general (a_string)
+		end
+
+	same_caseless_string (a_string: READABLE_STRING_GENERAL): BOOLEAN
+			-- Current value is a string value, and same caseless content as `a_string`?	
+		do
+			Result := unescaped_string_32.is_case_insensitive_equal_general (a_string)
+		end
 
 feature -- Conversion
 
@@ -381,7 +397,7 @@ feature -- Change Element
 			s_not_void: s /= Void
 		do
 			if attached {READABLE_STRING_8} s as s8 then
-				append_string (s.as_string_8)
+				append_string (s.to_string_8)
 			else
 				append_string_32 (s.as_string_32)
 			end
@@ -460,6 +476,7 @@ feature {NONE} -- Implementation
 			uc: CHARACTER_32
 			c: CHARACTER_8
 			h: STRING_8
+			l_utf_8_encoding_needed: BOOLEAN
 		do
 			n := s.count
 			create Result.make (n + n // 10)
@@ -497,6 +514,9 @@ feature {NONE} -- Implementation
 					when '%T' then
 						Result.append_string ("\t")
 					else
+						if uc.natural_32_code > 127 then
+							l_utf_8_encoding_needed := True
+						end
 						Result.extend (c)
 					end
 				else
@@ -524,12 +544,23 @@ feature {NONE} -- Implementation
 				end
 				i := i + 1
 			end
+			if l_utf_8_encoding_needed then
+				Result := utf_converter.utf_32_string_to_utf_8_string_8 (Result)
+				check is_valid_utf_8_string_8: utf_converter.is_valid_utf_8_string_8 (Result) end
+			end
+		end
+
+feature {NONE} -- Implementation
+
+	utf_converter: UTF_CONVERTER
+		once
+			create Result
 		end
 
 invariant
 	item_not_void: item /= Void
 
 note
-	copyright: "2010-2018, Javier Velilla, Jocelyn Fiat, Eiffel Software and others https://github.com/eiffelhub/json."
+	copyright: "2010-2019, Javier Velilla, Jocelyn Fiat, Eiffel Software and others https://github.com/eiffelhub/json."
 	license: "https://github.com/eiffelhub/json/blob/master/License.txt"
 end

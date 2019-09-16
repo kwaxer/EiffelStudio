@@ -5,6 +5,7 @@
 	author: "$Author$"
 	date: "$Date$"
 	revision: "$Revision$"
+	EIS: "name=Predefined metrics configuration", "src=https://svn.eiffel.com/eiffelstudio/trunk/Src/Delivery/studio/metrics/predefined_metrics.xml", "tag=Metrics"
 
 class
 	QL_NAMES
@@ -122,6 +123,7 @@ feature -- Criterion names
 	ql_cri_is_infix: STRING = "is_infix"
 	ql_cri_is_once: STRING = "is_once"
 	ql_cri_is_class: STRING = "is_class"
+	ql_cri_is_ghost: STRING = "is_ghost"
 	ql_cri_is_origin: STRING = "is_origin"
 	ql_cri_is_prefix: STRING = "is_prefix"
 	ql_cri_is_procedure: STRING = "is_procedure"
@@ -573,7 +575,7 @@ feature -- Access
 	ql_no_tag: STRING_32 = "no tag";
 
 note
-	copyright: "Copyright (c) 1984-2018, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

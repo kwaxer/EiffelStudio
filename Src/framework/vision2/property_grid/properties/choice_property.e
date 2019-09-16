@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "Property with several values to choose from."
 	date: "$Date$"
 	revision: "$Revision$"
@@ -80,7 +80,6 @@ feature {NONE} -- Agents
 		local
 			l_done: BOOLEAN
 			l_item: like value
-			l_converted_data: detachable like value
 		do
 			if attached text_field as l_text_field then
 				from
@@ -88,8 +87,10 @@ feature {NONE} -- Agents
 				until
 					l_done or item_strings.after
 				loop
-					l_converted_data := convert_to_data (l_text_field.text)
-					if l_converted_data /= Void and then l_converted_data ~ item_strings.item then
+					if
+						attached convert_to_data (l_text_field.text) as l_converted_data and then
+						l_converted_data ~ item_strings.item
+					then
 						if item_strings.islast then
 							l_item := item_strings.first
 						else
@@ -112,7 +113,10 @@ feature {NONE} -- Agents
 			Precursor
 			if attached text_field as l_text_field and then not l_text_field.is_destroyed then
 				l_text_field.disable_edit
-				l_text_field.pointer_button_press_actions.force_extend (agent switch)
+				l_text_field.pointer_button_press_actions.extend (agent (i_x, i_y, i_button: INTEGER; i_x_tilt, i_y_tilt, i_pressure: DOUBLE; i_screen_x, i_screen_y: INTEGER)
+						do
+							switch
+						end)
 				l_text_field.key_press_actions.extend (agent on_text_field_key)
 			end
 		end
@@ -127,50 +131,54 @@ feature {NONE} -- Agents
 			l_combo_popup: like combo_popup
 			l_combo_grid: like combo_grid
 		do
-			create l_combo_popup
-			combo_popup := l_combo_popup
-			l_combo_popup.set_position (popup_window.x_position, popup_window.y_position + popup_window.height)
-			l_combo_popup.set_width (popup_window.width)
+			if attached popup_window as w then
+				create l_combo_popup
+				combo_popup := l_combo_popup
+				l_combo_popup.set_position (w.x_position, w.y_position + w.height)
+				l_combo_popup.set_width (w.width)
 
-			create l_frame
-			l_frame.set_style ({EV_FRAME_CONSTANTS}.ev_frame_etched_out)
+				create l_frame
+				l_frame.set_style ({EV_FRAME_CONSTANTS}.ev_frame_etched_out)
 
-			create l_combo_grid
-			combo_grid := l_combo_grid
-			l_combo_grid.hide_header
-			l_combo_grid.pointer_button_press_item_actions.extend (agent combo_click)
-			l_combo_grid.key_press_actions.extend (agent on_combo_key)
-			l_frame.extend (l_combo_grid)
-			from
-				item_strings.start
-			until
-				item_strings.after
-			loop
-				create l_item.make_with_text (to_displayed_value (item_strings.item))
-				l_item.set_value (item_strings.item)
-				l_combo_grid.set_item (1, item_strings.index, l_item)
-				l_item.pointer_enter_actions.force_extend (agent combo_select (l_item))
-				if l_item.text.is_equal (displayed_value) then
-					l_item.enable_select
+				create l_combo_grid
+				combo_grid := l_combo_grid
+				l_combo_grid.hide_header
+				l_combo_grid.pointer_button_press_item_actions.extend (agent combo_click)
+				l_combo_grid.key_press_actions.extend (agent on_combo_key)
+				l_frame.extend (l_combo_grid)
+				from
+					item_strings.start
+				until
+					item_strings.after
+				loop
+					create l_item.make_with_text (to_displayed_value (item_strings.item))
+					l_item.set_value (item_strings.item)
+					l_combo_grid.set_item (1, item_strings.index, l_item)
+					l_item.pointer_enter_actions.extend (agent combo_select (l_item))
+					if l_item.text.is_equal (displayed_value) then
+						l_item.enable_select
+					end
+					item_strings.forth
 				end
-				item_strings.forth
-			end
-			if item_strings.count < 10 then
-				l_combo_popup.set_height ((item_strings.count) * (l_combo_grid.row_height) + 4)
+				if item_strings.count < 10 then
+					l_combo_popup.set_height ((item_strings.count) * (l_combo_grid.row_height) + 4)
+				else
+					l_combo_popup.set_height (10 * (l_combo_grid.row_height) + 4)
+				end
+				l_combo_grid.column (1).set_width (w.width)
+				l_combo_grid.hide_horizontal_scroll_bar
+				l_combo_grid.set_minimum_height (0)
+				l_combo_grid.set_minimum_width (0)
+
+				l_combo_popup.focus_out_actions.force (agent combo_focus_lost)
+				l_combo_grid.focus_out_actions.force (agent combo_focus_lost)
+
+				l_combo_popup.extend (l_frame)
+				l_combo_popup.show_actions.extend (agent l_combo_grid.set_focus)
+				l_combo_popup.show
 			else
-				l_combo_popup.set_height (10 * (l_combo_grid.row_height) + 4)
+				check from_precondition: attached popup_window end
 			end
-			l_combo_grid.column (1).set_width (popup_window.width)
-			l_combo_grid.hide_horizontal_scroll_bar
-			l_combo_grid.set_minimum_height (0)
-			l_combo_grid.set_minimum_width (0)
-
-			l_combo_popup.focus_out_actions.force (agent combo_focus_lost)
-			l_combo_grid.focus_out_actions.force (agent combo_focus_lost)
-
-			l_combo_popup.extend (l_frame)
-			l_combo_popup.show_actions.extend (agent l_combo_grid.set_focus)
-			l_combo_popup.show
 		end
 
 	deactivate
@@ -218,8 +226,11 @@ feature {NONE} -- Agents
 			a_key_not_void: a_key /= Void
 		do
 			if a_key.code = {EV_KEY_CONSTANTS}.key_enter and attached combo_grid as l_combo_grid then
-				if l_combo_grid.selected_items /= Void and then l_combo_grid.selected_items.count = 1 then
-					if attached {GENERIC_GRID_ITEM [G]} l_combo_grid.selected_items.first as l_item and then is_valid_value (l_item.value) then
+				if
+					attached l_combo_grid.selected_items as l_combo_selected_items and then
+					l_combo_selected_items.count = 1
+				then
+					if attached {GENERIC_GRID_ITEM [G]} l_combo_selected_items.first as l_item and then is_valid_value (l_item.value) then
 						set_value (l_item.value)
 					end
 					if not is_destroyed and then is_parented then
@@ -290,7 +301,7 @@ feature {NONE} -- Implementation
 		end
 
 note
-	copyright: "Copyright (c) 1984-2016, Eiffel Software and others"
+	copyright: "Copyright (c) 1984-2018, Eiffel Software and others"
 	license: "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

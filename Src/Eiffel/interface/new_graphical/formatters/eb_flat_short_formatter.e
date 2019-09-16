@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "Command to display the flat/short version of a class."
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
@@ -27,9 +27,7 @@ feature -- Properties
 	symbol: ARRAY [EV_PIXMAP]
 			-- Graphical representation of the command.
 		once
-			create Result.make (1, 2)
-			Result.put (pixmaps.icon_pixmaps.view_flat_contracts_icon, 1)
-			Result.put (pixmaps.icon_pixmaps.view_flat_contracts_icon, 2)
+			create Result.make_filled (pixmaps.icon_pixmaps.view_flat_contracts_icon, 1, 2)
 		end
 
 	pixel_buffer: EV_PIXEL_BUFFER
@@ -148,21 +146,11 @@ feature -- Status setting
 				set_dotnet_mode (False)
 				internal_consumed_type := Void
 			end
-			Precursor {EB_CLASS_TEXT_FORMATTER} (new_stone)
-		end
-
-	set_classi (a_class: CLASS_I)
-			-- Associate current formatter with non-compiled `a_class'.
-		do
-			class_i ?= a_class
-			class_cmd := Void
-			must_format := True
-			format
-			ensure_display_in_widget_owner
+			Precursor (new_stone)
 		end
 
 note
-	copyright: "Copyright (c) 1984-2015, Eiffel Software"
+	copyright: "Copyright (c) 1984-2018, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[
@@ -193,5 +181,4 @@ note
 			Customer support http://support.eiffel.com
 		]"
 
-end -- class EB_FLAT_SHORT_FORMATTER
-
+end

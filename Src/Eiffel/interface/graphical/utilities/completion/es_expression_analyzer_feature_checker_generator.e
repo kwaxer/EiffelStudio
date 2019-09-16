@@ -37,7 +37,7 @@ feature {AST_FEATURE_CHECKER_GENERATOR} -- Status report
 	is_void_safe_call: BOOLEAN
 			-- <Precursor>
 		do
-				-- Ignore Void-Safety.
+				-- Ignore Void safety.
 		end
 
 feature -- Basic operations
@@ -56,9 +56,7 @@ feature -- Basic operations
 			l_local: LOCAL_INFO
 			l_id: INTEGER
 		do
-			create l_local
-			l_local.set_position (context.locals.count + 1)
-			l_local.set_type (a_type)
+			create l_local.make (a_type, context.locals.count + 1)
 			l_id := names_heap.id_of (a_id.string)
 			if l_id = 0 then
 				names_heap.put (a_id.string)
@@ -101,7 +99,7 @@ feature {INSPECT_CONTROL} -- AST modification
 		end
 
 ;note
-	copyright: "Copyright (c) 1984-2016, Eiffel Software"
+	copyright: "Copyright (c) 1984-2018, Eiffel Software"
 	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

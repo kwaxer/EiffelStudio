@@ -10,22 +10,32 @@ inherit
 
 feature {COMPILER_ERROR} -- Visitor
 
-	process_missing_local_type (e: MISSING_LOCAL_TYPE_ERROR)
-			-- Visit `e`.
-		deferred
-		end
-
-	process_unused_local (e: UNUSED_LOCAL_WARNING)
-			-- Visit `e`.
-		deferred
-		end
-
 	process_array_explicit_type_required_for_conformance (e: VWMA_EXPLICIT_TYPE_REQUIRED_FOR_CONFORMANCE)
 			-- Visit `e`.
 		deferred
 		end
 
 	process_array_explicit_type_required_for_match (e: VWMA_EXPLICIT_TYPE_REQUIRED_FOR_MATCH)
+			-- Visit `e`.
+		deferred
+		end
+
+	process_missing_local_type (e: MISSING_LOCAL_TYPE_ERROR)
+			-- Visit `e`.
+		deferred
+		end
+
+	process_redefinition_for_effecting (e: VDRS4_EFFECTING)
+			-- Visit `e`.
+		deferred
+		end
+
+	process_redefinition_without_redeclaration (e: VDRS4_NO_REDECLARATION)
+			-- Visit `e`.
+		deferred
+		end
+
+	process_unused_local (e: UNUSED_LOCAL_WARNING)
 			-- Visit `e`.
 		deferred
 		end

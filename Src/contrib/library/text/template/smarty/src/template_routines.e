@@ -1,6 +1,4 @@
-note
-	description: "Objects that ..."
-	author: ""
+﻿note
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -12,7 +10,7 @@ inherit
 
 feature
 
-	internal_field_value (obj: ANY; fdn: STRING): detachable ANY
+	internal_field_value (obj: ANY; fdn: STRING): detachable CELL [detachable ANY]
 		require
 			obj_not_void: obj /= Void
 			field_name_not_void: fdn /= Void
@@ -26,7 +24,7 @@ feature
 				attached Template_inspectors.item (otn) as tpl_inspector and then
 				attached tpl_inspector.internal_data (fdn, obj) as cl -- If Void, this is not handled by tpl_inspector
 			then
-				Result := cl.item
+				Result := cl
 			else
 				if internal_info.has (otn) then
 					obj_fields := internal_info.item (otn)
@@ -37,9 +35,15 @@ feature
 					obj_fields /= Void and then
 					obj_fields.has (fdn)
 				then
-					Result := field (obj_fields.item (fdn), obj)
-				elseif attached {TABLE [detachable ANY, READABLE_STRING_GENERAL]} obj as l_table then
-					Result := l_table.item (fdn)
+					create Result.put (field (obj_fields.item (fdn), obj))
+				elseif attached {HASH_TABLE [detachable ANY, READABLE_STRING_GENERAL]} obj as htb then
+					if htb.has_key (fdn) then
+						create Result.put (htb.found_item)
+					end
+				elseif attached {TABLE [detachable ANY, READABLE_STRING_GENERAL]} obj as tb then
+					if tb.valid_key (fdn) then
+						create Result.put (tb.item (fdn))
+					end
 				end
 			end
 		end
@@ -49,7 +53,6 @@ feature
 			obj /= Void
 		local
 			fi, fc: INTEGER
-			fn: STRING
 			otn: STRING
 		do
 			otn := type_name (obj)
@@ -60,8 +63,7 @@ feature
 			until
 				fi > fc
 			loop
-				fn := field_name (fi, obj)
-				Result.force (fi, fn)
+				Result.force (fi, field_name (fi, obj))
 				fi := fi + 1
 			end
 			internal_info.force (Result, otn)
@@ -106,10 +108,11 @@ feature -- Inspectors
 		end
 
 note
-	copyright: "2011-2015, Jocelyn Fiat, and Eiffel Software"
+	copyright: "2011-2019, Jocelyn Fiat, and Eiffel Software"
 	license: "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Jocelyn Fiat
 			Contact: http://about.jocelynfiat.net/
 		]"
-end -- class TEMPLATE_ROUTINES
+
+end

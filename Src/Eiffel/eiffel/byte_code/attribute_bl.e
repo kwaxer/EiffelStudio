@@ -8,7 +8,6 @@ class ATTRIBUTE_BL
 inherit
 	ATTRIBUTE_B
 		redefine
-			free_register,
 			generate_access_on_type,
 			generate_parameters,
 			is_polymorphic,
@@ -35,21 +34,76 @@ inherit
 		end
 
 create
-	fill_from
+	fill_from,
+	fill_from_access
+
+feature {NONE} -- Creation
+
+	fill_from (a: ATTRIBUTE_B)
+			-- Fill in node with attribute `a`.
+		require
+			system.has_class_of_id (a.written_in)
+			attached system.class_of_id (a.written_in) as c
+			attached c.feature_of_rout_id (a.routine_id) as f
+			f.is_attribute
+			f.rout_id_set.has (a.routine_id)
+		do
+			attribute_name_id := a.attribute_name_id
+			routine_id := a.routine_id
+			attribute_id := a.attribute_id
+			written_in := a.written_in
+			type := a.type
+			multi_constraint_static := a.multi_constraint_static
+			is_attachment := a.is_attachment
+		ensure
+			attribute_name_id = a.attribute_name_id
+			routine_id = a.routine_id
+			attribute_id = a.attribute_id
+			written_in = a.written_in
+			type = a.type
+			multi_constraint_static = a.multi_constraint_static
+			is_attachment = a.is_attachment
+		end
+
+	fill_from_access (a: CALL_ACCESS_B; f: FEATURE_I)
+			-- Fill in node with attribute `f` originally represented by `a`.
+		require
+			f.is_attribute
+			system.has_class_of_id (f.written_in)
+			attached system.class_of_id (f.written_in) as c
+				-- `f` could come from a descendant and originate from an unrelated class.
+			f.rout_id_set.has (a.routine_id)
+		do
+			attribute_name_id := f.feature_name_id
+			routine_id := f.rout_id_set.first
+			attribute_id := f.feature_id
+			written_in := f.written_in
+			type := a.type
+			multi_constraint_static := a.multi_constraint_static
+				-- `is_attachment` is `False` by default.
+		ensure
+			attribute_name_id = f.feature_name_id
+			routine_id = f.rout_id_set.first
+			attribute_id = f.feature_id
+			written_in = f.written_in
+			type = a.type
+			multi_constraint_static = a.multi_constraint_static
+			not is_attachment
+		end
 
 feature
 
 	parent: NESTED_B
-			-- Parent of the current call
+			-- Parent of the current call.
 
 	set_parent (p: NESTED_B)
-			-- Assign `p' to `parent'
+			-- Assign `p` to `parent`.
 		do
 			parent := p
 		end
 
 	register: REGISTRABLE
-			-- In which register the expression is stored
+			-- In which register the expression is stored.
 
 	set_register (r: REGISTRABLE)
 			-- Set current register to `r'
@@ -57,46 +111,23 @@ feature
 			register := r
 		end
 
-	free_register
-			-- Free registers
-		do
-			Precursor {ATTRIBUTE_B}
-		end
-
 	analyze
 			-- Analyze attribute
 		do
-debug
-io.error.put_string ("In attribute_bl%N")
-io.error.put_string (attribute_name)
-io.error.put_new_line
-end
 			analyze_on (Current_register)
 			get_register
-debug
-io.error.put_string ("Out attribute_bl%N")
-end
 		end
 
 	analyze_on (reg: REGISTRABLE)
 			-- Analyze access to attribute on `reg'
 		do
-debug
-io.error.put_string ("In attribute_bl [analyze_on]: ")
-io.error.put_string (attribute_name)
-io.error.put_new_line
-end
 			if reg.is_current then
 				context.mark_current_used
+					-- Check whether we'll need to compute the dynamic type of current.
+				if is_polymorphic then
+					context.add_dt_current
+				end
 			end
-				-- Check whether we'll need to compute the dynamic type
-				-- of current or not.
-			check_dt_current (reg)
-debug
-io.error.put_string ("Out attribute_bl [analyze_on]: ")
-io.error.put_string (attribute_name)
-io.error.put_new_line
-end
 		end
 
 	generate_on (reg: REGISTRABLE)
@@ -111,27 +142,14 @@ end
 			do_generate (Current_register)
 		end
 
-	check_dt_current (reg: REGISTRABLE)
-			-- Check whether we need to compute the dynamic type of current
-			-- and call context.add_dt_current accordingly. The parameter
-			-- `reg' is the entity on which the access is made.
-		do
-				-- Do nothing if `reg' is not the current entity
-			if reg.is_current then
-				if Eiffel_table.is_polymorphic (routine_id, context_type, context.context_class_type, False) >= 0 then
-					context.add_dt_current
-				end
-			end
-		end
-
 	is_polymorphic: BOOLEAN
-			-- Is access polymorphic ?
+			-- Is access polymorphic?
 		local
 			type_i: TYPE_A
 		do
 			type_i := context_type
 			if not type_i.is_basic then
-				Result := Eiffel_table.is_polymorphic (routine_id, type_i, context.context_class_type, False) >= 0
+				Result := eiffel_table.is_polymorphic_for_offset (routine_id, type_i, context.original_class_type) >= 0
 			end
 		end
 
@@ -144,16 +162,11 @@ end
 	generate_access_on_type (reg: REGISTRABLE; typ: CL_TYPE_A)
 			-- Generate attribute in a `typ' context
 		local
-			table_name: STRING
 			type_c: TYPE_C
 			type_i: TYPE_A
 			buf: GENERATION_BUFFER
-			array_index: INTEGER
 		do
-			if not reg.c_type.is_reference then
-					-- This is an access on a value of an object of basic type.
-				reg.print_register
-			else
+			if reg.c_type.is_reference then
 				buf := buffer
 				type_i := real_type (type)
 				type_c := type_i.c_type
@@ -167,55 +180,12 @@ end
 				end
 				buf.put_character ('(')
 				reg.print_target_register
-				array_index := Eiffel_table.is_polymorphic (routine_id, typ, context.context_class_type, False)
-				if array_index >= 0 then
-						-- The access is polymorphic, which means the offset
-						-- is not a constant and has to be computed.
-					table_name := Encoder.attribute_table_name (routine_id)
-
-						-- Generate following dispatch:
-						-- table [Actual_offset - base_offset]
-					buf.put_string (" + ")
-					buf.put_string (table_name)
-					buf.put_character ('[')
-					if reg.is_current then
-						context.generate_current_dtype
-					else
-						buf.put_string ({C_CONST}.dtype);
-						buf.put_character ('(')
-						reg.print_register
-						buf.put_character (')')
-					end
-					buf.put_character ('-')
-					buf.put_integer (array_index)
-					buf.put_character (']')
-
-						-- Mark attribute offset table used.
-					Eiffel_table.mark_used (routine_id)
-						-- Remember external attribute offset declaration
-					Extern_declarations.add_attribute_table (table_name)
-				else
-
-						-- Hardwire the offset
-					check
-						is_attribute_table: attached {ATTR_TABLE [ATTR_ENTRY]} eiffel_table.poly_table (routine_id) as l_attr
-					then
-						l_attr.generate_attribute_offset (buf, typ, context.context_class_type)
-					end
-				end
+				eiffel_table.generate_offset (routine_id, reg, typ, context.original_class_type, buf)
 				buf.put_character (')')
+			else
+					-- This is an access on a value of an object of basic type.
+				reg.print_register
 			end
-		end
-
-	fill_from (a: ATTRIBUTE_B)
-			-- Fill in node with attribute `a'
-		do
-			attribute_name_id := a.attribute_name_id
-			attribute_id := a.attribute_id
-			type := a.type
-			routine_id := a.routine_id
-			multi_constraint_static := a.multi_constraint_static
-			is_attachment := a.is_attachment
 		end
 
 feature {NONE} -- Separate call
@@ -224,58 +194,20 @@ feature {NONE} -- Separate call
 			-- <Precursor>
 		local
 			buf: GENERATION_BUFFER
-			array_index: INTEGER_32
-			target_type: TYPE_A
-			name: STRING
 		do
 			buf := buffer
-
 				-- Generate the feature name.
 			buf.put_string ({C_CONST}.null)
-
 				-- Generate the feature pattern.
 			buf.put_two_character (',', ' ')
 			system.separate_patterns.put (Current)
-
 				-- Generate the offset.
-			buf.put_two_character (',', ' ')
-
-			target_type := context_type
-			array_index := Eiffel_table.is_polymorphic (routine_id, target_type, Context.context_class_type, True)
-			if array_index >= 0 then
-					-- The access is polymorphic, which means the offset
-					-- is not a constant and has to be computed.
-				name := Encoder.attribute_table_name (routine_id)
-					-- Generate following dispatch:
-					-- table [Actual_offset - base_offset]
-				buf.put_string (name)
-				buf.put_character ('[')
-				buf.put_string ({C_CONST}.dtype);
-				buf.put_character ('(')
-				a_target.print_register
-				buf.put_character (')')
-				buf.put_character ('-')
-				buf.put_integer (array_index)
-				buf.put_character (']')
-					-- Mark attribute offset table used.
-				Eiffel_table.mark_used (routine_id)
-					-- Remember external attribute offset declaration
-				Extern_declarations.add_attribute_table (name)
-			else
-					-- Hardwire the offset
-				check
-					attached {ATTR_TABLE [ATTR_ENTRY]} eiffel_table.poly_table (routine_id) as attr_table
-				then
-						-- Offset is not generated if it is zero, so to make the generated code valid,
-						-- the base value "0" has to be generated.
-					buf.put_character ('0')
-					attr_table.generate_attribute_offset (buf, target_type, context.context_class_type)
-				end
-			end
+			buf.put_three_character (',', ' ', '0')
+			eiffel_table.generate_offset (routine_id, a_target, context_type, context.context_class_type, buf)
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2016, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "Generation of IL code for stack based virtual machine."
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
@@ -366,11 +366,10 @@ feature -- Variables access
 		deferred
 		end
 
-	generate_eiffel_metamorphose (a_type: TYPE_A)
+	generate_eiffel_metamorphose (a_type: BASIC_A)
 			-- Generate a metamorphose of `a_type' into a _REF type.
 		require
 			a_type_not_void: a_type /= Void
-			a_type_is_basic: a_type.is_basic
 		deferred
 		end
 
@@ -904,6 +903,13 @@ feature -- Constants generation
 		deferred
 		end
 
+	put_immutable_manifest_string_8 (s: READABLE_STRING_GENERAL)
+			-- Put `s' on IL stack.
+		require
+			valid_s: s /= Void
+		deferred
+		end
+
 	put_manifest_string_32_from_system_string_local (n: INTEGER)
 			-- Create a manifest string by using local at position `n' which
 			-- should be of type SYSTEM_STRING.
@@ -914,6 +920,13 @@ feature -- Constants generation
 
 	put_manifest_string_32 (s: READABLE_STRING_32)
 			-- Put `s' on IL stack.
+		require
+			valid_s: s /= Void
+		deferred
+		end
+
+	put_immutable_manifest_string_32 (s: READABLE_STRING_32)
+			-- Put instance of platform IMMUTABLE_STRING_32 object corresponding to `s' on IL stack.
 		require
 			valid_s: s /= Void
 		deferred
@@ -1078,9 +1091,16 @@ feature -- Binary operator generation
 			-- Generate a binary operator comparison for REAL_XX types when
 			-- user chose to have a total order on REALs.
 		require
-			a_code_valid: a_code = {IL_CONST}.il_ne or a_code = {IL_CONST}.il_eq or
-				a_code = {IL_CONST}.il_le or a_code = {IL_CONST}.il_lt or
-				a_code = {IL_CONST}.il_ge or a_code = {IL_CONST}.il_gt
+			a_code_valid:
+				a_code = {IL_CONST}.il_ne or
+				a_code = {IL_CONST}.il_eq or
+				a_code = {IL_CONST}.il_le or
+				a_code = {IL_CONST}.il_lt or
+				a_code = {IL_CONST}.il_ge or
+				a_code = {IL_CONST}.il_gt or
+				a_code = {IL_CONST}.il_max or
+				a_code = {IL_CONST}.il_min or
+				a_code = {IL_CONST}.il_three_way_comparison
 			a_return_type_not_void: a_return_type /= Void
 			a_return_type_valid: a_return_type.is_boolean or a_return_type.is_integer or
 				a_return_type.is_real_32 or a_return_type.is_real_64
@@ -1285,7 +1305,7 @@ feature -- Generic conformance
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2013, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[
@@ -1316,4 +1336,4 @@ note
 			Customer support http://support.eiffel.com
 		]"
 
-end -- class CIL_CODE_GENERATOR
+end

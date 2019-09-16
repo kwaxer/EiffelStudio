@@ -84,7 +84,9 @@ feature -- Macros
 	rti64c: STRING = "RTI64C"
 	rtu64c: STRING = "RTU64C"
 	rtms_ex_h: STRING = "RTMS_EX_H"
+	rtmis8_ex_h: STRING = "RTMIS8_EX_H"
 	rtms32_ex_h: STRING = "RTMS32_EX_H"
+	rtmis32_ex_h: STRING = "RTMIS32_EX_H"
 	dtype: STRING = "Dtype"
 	dftype: STRING = "Dftype"
 	rtcv_open: STRING = "RTCV("
@@ -92,7 +94,8 @@ feature -- Macros
 	rtcw_arg: STRING = "RTCW(arg"
 	rtcw_earg: STRING = "RTCW(earg"
 	rtcw_loc: STRING = "RTCW(loc"
-	rtnr: STRING = "RTNR"
+	open_rtna_open: STRING = "(RTNA("
+	rtnr_close: STRING = "RTNR)"
 	rtar_open: STRING = "RTAR("
 	rtal: STRING = "RTAL"
 	rtgc: STRING = "RTGC"
@@ -125,6 +128,9 @@ feature -- Macros
 	rtjb: STRING = "RTJB"
 	rtck: STRING = "RTCK"
 	rtcf: STRING = "RTCF"
+	rtct: STRING = "RTCT"
+	rtct0: STRING = "RTCT0"
+	rtit: STRING = "RTIT"
 
 	rtsn: STRING = "RTSN"
 	rtda: STRING = "RTDA"
@@ -213,7 +219,7 @@ feature -- C language
 	volatile: STRING = "volatile"
 
 note
-	copyright: "Copyright (c) 1984-2018, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

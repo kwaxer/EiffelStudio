@@ -96,27 +96,27 @@ feature {NONE} -- Initialization: User interface
 
 				-- Create columns
 			l_col := a_widget.column (category_column)
-			l_col.set_width (40)
+			l_col.set_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (40))
 
 			l_col := a_widget.column (rule_column)
 			l_col.set_title (interface_names.l_rule_code)
-			l_col.set_width (50)
+			l_col.set_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (50))
 
 			l_col := a_widget.column (description_column)
 			l_col.set_title (interface_names.l_description)
-			l_col.set_width (100)
+			l_col.set_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (100))
 
 			l_col := a_widget.column (context_column)
 			l_col.set_title (interface_names.l_location)
-			l_col.set_width (200)
+			l_col.set_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (200))
 
 			l_col := a_widget.column (position_column)
 			l_col.set_title (interface_names.l_position)
-			l_col.set_width (80)
+			l_col.set_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (80))
 
 			l_col := a_widget.column (severity_column)
 			l_col.set_title (interface_names.l_severity)
-			l_col.set_width (50)
+			l_col.set_width ({EV_MONITOR_DPI_DETECTOR_IMP}.scaled_size (50))
 			l_col.hide
 
 			a_widget.enable_tree
@@ -1216,7 +1216,7 @@ feature {NONE} -- Fixing
 	add_fix_component (e: EVENT_LIST_ITEM_I; i: EB_GRID_EDITOR_TOKEN_ITEM)
 			-- Add a fix option of `e' to the item `i'.
 		local
-			fix_component: detachable ES_FIX
+			fix_component: ES_FIX
 			f: ITERABLE [FIX [TEXT_FORMATTER]]
 		do
 			if attached {COMPILER_ERROR} e.data as ce then
@@ -1232,13 +1232,7 @@ feature {NONE} -- Fixing
 					attached fix_component
 				loop
 						-- Associate fix option with the grid item.
-						-- TODO: Handle other types of fixes by adding a factory class based on a visitor pattern,
-						-- so that adding a new fix class does not pass unnoticed.
-					if attached {FIX_FEATURE} o.item as u then
-						create {ES_FIX_FEATURE} fix_component.make (u)
-					elseif attached {CA_FIX} o.item as u then
-						create {ES_CA_FIX_EXECUTOR} fix_component.make (u)
-					end
+					fix_component := {ES_FIX_FACTORY}.create_component (o.item)
 					if attached fix_component then
 							-- Augment `i'  with a notification that a fix is available.
 						i.append_component (fix_component)
@@ -1257,6 +1251,7 @@ feature {NONE} -- Fixing
 
 	apply_single_fix_without_undo_prompt (r: EV_GRID_ROW)
 			-- Attempt to apply a fix chosen for row `r' without notification about "undo" behaviour.
+			-- Open an editor for the affected class if `is_editor_requested`.
 		local
 			i: INTEGER
 		do
@@ -1318,7 +1313,7 @@ feature {NONE} -- Fixing
 		end
 
 	apply_fixes (f: ARRAYED_LIST [ES_FIX]; c: CLASS_C)
-			-- Apply fixes `f` to class `c`.
+			-- Apply fixes `f` to class `c` opening a new editor if `is_editor_requested`.
 		local
 			m: ES_CLASS_TEXT_AST_MODIFIER
 		do
@@ -1331,6 +1326,16 @@ feature {NONE} -- Fixing
 				prompts.show_error_prompt (locale.formatted_string
 					(locale.translation_in_context ("Class $1 has been changed and should be recompiled before applying fixes.", once "tool.error"), c.name) , develop_window.window, Void)
 			elseif m.is_modifiable then
+				if preferences.dialog_data.open_class_on_fix_preference.value then
+						-- Make sure there are editors with the class.
+					develop_window.commands.new_tab_cmd.execute_with_stone (create {CLASSC_STONE}.make (c))
+						-- Make sure all editors associated with the class finish loading of the text.
+					across
+						develop_window.editors_manager.editor_editing (c.lace_class) as e
+					loop
+						e.item.flush
+					end
+				end
 				m.execute_batch_modifications (agent (modifier: ES_CLASS_TEXT_AST_MODIFIER; fixes: ARRAYED_LIST [ES_FIX])
 					local
 						a: CLASS_AS
@@ -1349,30 +1354,37 @@ feature {NONE} -- Fixing
 							modifier.replace_code (s.start_position, s.end_position, modifier.ast_match_list.text_32 (r))
 						end
 					end (m, f), True, True)
+				;(create {ES_CLASS_LICENSER}).relicense (c.lace_class)
 			else
 				prompts.show_error_prompt (interface_names.l_class_is_not_writable (c.name), develop_window.window, Void)
 			end
 		end
 
 	fix_undo_promt (action: PROCEDURE)
-			-- Raise a discardable prompt about performing fixes by `action' with the description of "undo" behaviour.
+			-- Raise a discardable prompt about performing fixes by `action` with the description of "undo" behaviour
+			-- and call the action with the flag indicating whether a new editor for every class should be open.
 		local
-			p: ES_DISCARDABLE_WARNING_PROMPT
+			p: ES_DISCARDABLE_QUESTION_WARNING_PROMPT
+			a: PROCEDURE
 		do
-			create p.make_standard_with_cancel
+			create p.make_standard_persistent
 				(warning_messages.w_fix_undo_warning,
 				interface_names.l_discard_fix_undo_warning,
-				create {ES_BOOLEAN_PREFERENCE_SETTING}.make (preferences.dialog_data.confirm_fix_without_undo_preference, False))
-			p.set_button_action
-				(p.default_confirm_button,
-				agent (a: PROCEDURE)
-					do
-							-- Perform original action.
-						a.call
-							-- Update toolbar buttons state that may be changed by the previous instruction.
-						update_content_applicable_widgets (grid_events.row_count > 0)
-					end (action))
+				create {ES_BOOLEAN_PREFERENCE_SETTING}.make (preferences.dialog_data.confirm_fix_without_undo_preference, False),
+				create {ES_BOOLEAN_PREFERENCE_SETTING}.make (preferences.dialog_data.open_class_on_fix_preference, True))
+			a := agent apply_fixes_and_update_toolbar (action)
+			p.set_button_action ({ES_DIALOG_BUTTONS}.yes_button, a)
+			p.set_button_action ({ES_DIALOG_BUTTONS}.no_button, a)
 			p.show_on_active_window
+		end
+
+	apply_fixes_and_update_toolbar (action: PROCEDURE)
+			-- Apply fixes by calling `action` and update toolbar.
+		do
+				-- Perform original action.
+			action.call
+				-- Update toolbar buttons state that may be changed by the previous instruction.
+			update_content_applicable_widgets (grid_events.row_count > 0)
 		end
 
 	fix_factory: FIX_FACTORY
@@ -1415,9 +1427,7 @@ feature {NONE} -- Event handlers: event list
 					set_warning_count (warning_count + 1)
 				elseif is_hint_event (a_event_item) then
 					set_hint_count (hint_count + 1)
-				elseif is_ok_event (a_event_item) then
-						-- Nothing to do.
-				else
+				elseif not is_ok_event (a_event_item) then
 					check from_is_appliable_event_postcondition: False end
 				end
 			end
@@ -1445,9 +1455,7 @@ feature {NONE} -- Event handlers: event list
 					set_warning_count (warning_count - 1)
 				elseif is_hint_event (a_event_item) then
 					set_hint_count (hint_count - 1)
-				elseif is_ok_event (a_event_item) then
-						-- Nothing to do.
-				else
+				elseif not is_ok_event (a_event_item) then
 					check from_is_appliable_event_postcondition: False end
 				end
 			end
@@ -1697,8 +1705,6 @@ feature {NONE} -- Action handlers
 		require
 			is_interface_usable: is_interface_usable
 			is_initialized: is_initialized
-		local
-			l_error: ERROR
 		do
 			if
 				grid_events.has_selected_row and then
@@ -1707,14 +1713,10 @@ feature {NONE} -- Action handlers
 				attached {ERROR} l_event.data as e
 			then
 					-- Retrieve error item.
-				l_error := e
-			end
-
-			if l_error = Void then
+				error_info_command.execute_with_stone (create {ERROR_STONE}.make (e))
+			else
 					-- No error found. This can happen when the expanded information row is selected.
 				error_info_command.execute
-			else
-				error_info_command.execute_with_stone (create {ERROR_STONE}.make (l_error))
 			end
 		end
 
@@ -2164,7 +2166,7 @@ invariant
 	item_count_matches_error_and_warning_count: error_count + warning_count + hint_count = item_count
 
 ;note
-	copyright: "Copyright (c) 1984-2017, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

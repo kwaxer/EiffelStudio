@@ -43,11 +43,10 @@ feature -- Access
 	found: BOOLEAN
 			-- Has last search been successful?
 
-	id_of (s: STRING): INTEGER
+	id_of (s: READABLE_STRING_8): INTEGER
 			-- Id of `s' if inserted, otherwise 0.
 		require
 			s_not_void: s /= Void
-			s_valid_type: s.same_type (string_type)
 		local
 			l_lookup_table: like lookup_table
 		do
@@ -194,7 +193,7 @@ feature {NONE} -- Implementation: access
 	area: SPECIAL [STRING]
 			-- Store string names indexed by their ID.
 
-	lookup_table: HASH_TABLE [INTEGER, STRING]
+	lookup_table: HASH_TABLE [INTEGER, READABLE_STRING_8]
 			-- Hash-table indexed by string names
 			-- Values are indexes of Current to access corresponding
 			-- key in an efficient manner.
@@ -426,6 +425,15 @@ feature {NONE} -- Implementation: access
 			put ("is_attached") check found_item = is_attached_name_id end
 			put ("is_deferred") check found_item = is_deferred_name_id end
 			put ("is_expanded") check found_item = is_expanded_name_id end
+			put ("minus") check found_item = minus_name_id end
+			put ("ieee_is_equal") check found_item = ieee_is_equal_name_id end
+			put ("ieee_is_greater") check found_item = ieee_is_greater_name_id end
+			put ("ieee_is_greater_equal") check found_item = ieee_is_greater_equal_name_id end
+			put ("ieee_is_less") check found_item = ieee_is_less_name_id end
+			put ("ieee_is_less_equal") check found_item = ieee_is_less_equal_name_id end
+			put ("ieee_maximum_number") check found_item = ieee_maximum_number_name_id end
+			put ("ieee_minimum_number") check found_item = ieee_minimum_number_name_id end
+			put ("make_from_c_byte_array") check found_item = make_from_c_byte_array_name_id end
 		end
 
 invariant
@@ -434,7 +442,7 @@ invariant
 	found_item_positive: found_item >= 0
 
 note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

@@ -5,12 +5,16 @@ note
 		"Xace XML preprocessor"
 
 	library: "Gobo Eiffel Tools Library"
-	copyright: "Copyright (c) 2001-2014, Andreas Leitner and others"
+	copyright: "Copyright (c) 2001-2019, Andreas Leitner and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
 
 class ET_XACE_PREPROCESSOR
+
+obsolete
+
+	"Use ET_ECF_* classes instead. [2019-03-17]"
 
 inherit
 
@@ -161,7 +165,7 @@ feature {NONE} -- Implementation
 			equal_index: INTEGER
 		do
 			if a_string.occurrences ('=') > 0 then
-				-- expression is a comparsion of two constants or variables
+				-- expression is a comparison of two constants or variables
 				equal_index := a_string.index_of ('=', 1)
 				if equal_index = 1 then
 					a_left_side := STRING_.new_empty_string (a_string, 0)

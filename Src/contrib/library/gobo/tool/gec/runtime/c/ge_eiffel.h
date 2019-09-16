@@ -4,7 +4,7 @@
 		"C declarations for the Gobo Eiffel runtime."
 
 	system: "Gobo Eiffel Compiler"
-	copyright: "Copyright (c) 2005-2016, Eric Bezault and others"
+	copyright: "Copyright (c) 2005-2019, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -46,6 +46,8 @@
 #define EIF_WINDOWS 1
 #include <windows.h>
 #endif
+
+#define BYTEORDER 0x1234
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -138,7 +140,7 @@ typedef int intptr_t;
 #endif
 
 /* C type for underlying integer type identifying object's dynamic type. */
-typedef uint16_t	EIF_TYPE_INDEX;
+typedef uint16_t EIF_TYPE_INDEX;
 
 /*
  * Abstraction representing an Eiffel type.
@@ -156,8 +158,8 @@ typedef struct eif_type {
  * It is used to provide backward compatibility to most Eiffel and
  * C APIs manipulating types as an INTEGER.
  */
-typedef int32_t	EIF_ENCODED_TYPE;
-typedef EIF_ENCODED_TYPE	EIF_TYPE_ID;
+typedef int32_t EIF_ENCODED_TYPE;
+typedef EIF_ENCODED_TYPE EIF_TYPE_ID;
 #define EIF_NO_TYPE (EIF_TYPE_ID)(-1)
 
 /* Basic Eiffel types */
@@ -205,14 +207,45 @@ typedef EIF_NATIVE_CHAR* EIF_FILENAME;
 #if defined (_MSC_VER) && (_MSC_VER < 1400) /* MSC older than v8 */
 #define GE_int64(x) x##i64
 #define GE_nat64(x) x##ui64
-#else
-#if defined (__BORLANDC__) && (__BORLANDC__ < 0x600) /* Borland before 6.0 */
+#elif defined(__BORLANDC__) && (__BORLANDC__ < 0x600) /* Borland before 6.0 */
 #define GE_int64(x) x##i64
 #define GE_nat64(x) x##ui64
 #else /* ISO C 99 */
 #define GE_int64(x) x##LL
 #define GE_nat64(x) x##ULL
 #endif
+#ifdef __LCC__
+/* lcc-win32 reports a constant overflow for -21474836478. */
+#define GE_min_int32 (-GE_int32(2147483647)-GE_int32(1))
+#else
+#define GE_min_int32 GE_int32(-2147483648)
+#endif
+#define GE_max_int32 GE_int32(2147483647)
+#if defined(__LCC__) || defined(__GNUC__) || defined(__MINGW32__)
+/* lcc-win32 reports a constant overflow for -9223372036854775808. */
+/* gcc and mingw-win64 warn that integer constant is so large that it is unsigned. */
+#define GE_min_int64 (-GE_int64(9223372036854775807)-GE_int64(1))
+#else
+#define GE_min_int64 GE_int64(-9223372036854775808)
+#endif
+#if defined(__LCC__) && !defined(_WIN64)
+/* lcc-win32 does not consider 64 bit constants as constants in case statement. */
+#define GE_case_int64(x) ((int32_t)(x))
+#define GE_case_nat64(x) ((uint32_t)(x))
+#else
+#define GE_case_int64(x) (x)
+#define GE_case_nat64(x) (x)
+#endif
+
+#ifdef _WIN64
+#define GE_IS_64_BITS EIF_TRUE
+#else
+#define GE_IS_64_BITS EIF_TEST(sizeof(void*)==64)
+#endif
+
+/* Posix threads */
+#if !defined(EIF_WINDOWS)
+#define GE_USE_POSIX_THREADS
 #endif
 
 #ifdef _MSC_VER /* MSVC */
@@ -232,6 +265,7 @@ typedef EIF_NATIVE_CHAR* EIF_FILENAME;
 #define RTI64C(x) GE_int64(x)
 #define EIF_OBJECT EIF_REFERENCE
 #define EIF_OBJ EIF_OBJECT
+#define OVERHEAD sizeof(EIF_ANY)
 /* Function pointer call to make sure all arguments are correctly pushed onto stack. */
 /* FUNCTION_CAST is for standard C calls. */
 /* FUNCTION_CAST_TYPE is for non-standard C calls. */
@@ -242,8 +276,8 @@ typedef EIF_NATIVE_CHAR* EIF_FILENAME;
 #define rt_public				/* default C scope */
 #define rt_private static		/* static outside a block means private */
 #define rt_shared				/* data shared between modules, but not public */
-typedef intptr_t	rt_int_ptr;
-typedef uintptr_t	rt_uint_ptr;
+typedef intptr_t rt_int_ptr;
+typedef uintptr_t rt_uint_ptr;
 #define RTMS(s) GE_str8(s)
 #define RTMS_EX(s,c) GE_ms8((s),(c))
 

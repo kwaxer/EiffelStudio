@@ -18,7 +18,9 @@ inherit
 			setup_hooks,
 			initialize,
 			install,
-			oauth20_api
+			oauth20_api,
+			permissions,
+			has_permission_to_use_authentication
 		end
 
 	CMS_ADMINISTRABLE
@@ -51,6 +53,22 @@ feature {NONE} -- Initialization
 feature -- Access
 
 	name: STRING = "oauth20"
+
+	permissions: LIST [READABLE_STRING_8]
+			-- List of permission ids, used by this module, and declared.
+		do
+			Result := Precursor
+			Result.extend (perm_use_oauth2_auth)
+			Result.extend (perm_account_oauth2_register)
+		end
+
+	perm_use_oauth2_auth: STRING = "use oauth2_auth"
+	perm_account_oauth2_register: STRING = "oauth2 account register"
+
+	has_permission_to_use_authentication (api: CMS_API): BOOLEAN
+		do
+			Result := api.has_permission (perm_use_oauth2_auth)
+		end
 
 feature {CMS_EXECUTION} -- Administration
 
@@ -87,8 +105,6 @@ feature {CMS_API} -- Module Initialization
 feature {CMS_API} -- Module management
 
 	install (api: CMS_API)
-		local
-			l_consumers: LIST [STRING]
 		do
 				-- Schema
 			if attached api.storage.as_sql_storage as l_sql_storage then
@@ -96,44 +112,14 @@ feature {CMS_API} -- Module management
 				l_sql_storage.sql_execute_file_script (api.module_resource_location (Current, (create {PATH}.make_from_string ("scripts")).extended ("install.sql")), Void)
 
 				if l_sql_storage.has_error then
-					api.logger.put_error ("Could not initialize database for module [" + name + "]", generating_type)
+					api.report_error ("[" + name + "]: installation failed (install)!", l_sql_storage.error_handler.as_string_representation)
 				else
-						-- TODO workaround.
-					l_sql_storage.sql_execute_file_script (api.module_resource_location (Current, (create {PATH}.make_from_string ("scripts")).extended ("data.sql")), Void)
-					if l_sql_storage.has_error then
-						api.logger.put_error ("Could not initialize oauth2_consumers for module [" + name + "]", generating_type)
-					else
-							-- TODO workaround, until we have an admin module
-						l_sql_storage.sql_query ("SELECT name FROM oauth2_consumers;", Void)
-						if l_sql_storage.has_error then
-							api.logger.put_error ("Could not initialize database for different consumers", generating_type)
-						else
-							from
-								l_sql_storage.sql_start
-								create {ARRAYED_LIST [STRING]} l_consumers.make (2)
-							until
-								l_sql_storage.sql_after
-							loop
-								if attached l_sql_storage.sql_read_string (1) as l_name then
-									l_consumers.force ("oauth2_" + l_name)
-								end
-								l_sql_storage.sql_forth
-							end
-							l_sql_storage.sql_finalize
-
-							across l_consumers as ic  loop
-								if not l_sql_storage.sql_table_exists (ic.item) then
-									if attached l_sql_storage.sql_script_content (api.module_resource_location (Current, (create {PATH}.make_from_string ("scripts")).extended ("oauth2_table.sql.tpl"))) as sql then
-											-- FIXME: shouldn't we use a unique table for all oauth providers? or as it is .. one table per oauth provider?
-										sql.replace_substring_all ("$table_name", ic.item)
-										l_sql_storage.sql_execute_script (sql, Void)
-									end
-								end
-							end
-						end
-						l_sql_storage.sql_finalize
-
-						Precursor {CMS_AUTH_MODULE_I}(api) -- Marked as installed.
+					Precursor {CMS_AUTH_MODULE_I}(api) -- Marked as installed.
+					l_sql_storage.sql_finalize
+					if attached api.user_api.authenticated_user_role as l_role then
+							-- By default, user can login with OAuth!
+						l_role.add_permission (perm_use_oauth2_auth)
+						api.user_api.save_user_role (l_role)
 					end
 				end
 			end
@@ -205,9 +191,13 @@ feature -- Router
 				a_router.handle ("/account/auth/login-with-oauth/{" + oauth_callback_path_parameter + "}",
 						create {WSF_URI_TEMPLATE_AGENT_HANDLER}.make (agent handle_login_with_oauth (a_api, l_oauth_api, ?, ?)),
 						a_router.methods_get_post)
-				a_router.handle ("/account/auth/oauth-callback/{" + oauth_callback_path_parameter + "}",
+				a_router.handle (oauth_callback_path + "{" + oauth_callback_path_parameter + "}",
 						create {WSF_URI_TEMPLATE_AGENT_HANDLER}.make (agent handle_callback_oauth (a_api, l_oauth_api, ?, ?)),
 						a_router.methods_get_post)
+				a_router.handle (oauth_register_path,
+						create {WSF_URI_TEMPLATE_AGENT_HANDLER}.make (agent handle_register (a_api, l_oauth_api, ?, ?)),
+						a_router.methods_post)
+
 				a_router.handle ("/account/auth/oauth-associate",
 						create {WSF_URI_TEMPLATE_AGENT_HANDLER}.make (agent handle_associate (a_api, l_oauth_api, ?, ?)),
 						a_router.methods_post)
@@ -219,6 +209,10 @@ feature -- Router
 
 	oauth_callback_path_parameter: STRING = "callback"
 			-- Callback path parameter.	
+
+	oauth_callback_path: STRING = "/account/auth/oauth-callback/"
+
+	oauth_register_path: STRING = "/account/auth/oauth-register/"
 
 	oauth_code_query_parameter: STRING = "code"
 			-- Code query parameter, specific to OAuth protocol.
@@ -284,24 +278,26 @@ feature -- Hooks
 			r: CMS_RESPONSE
 			l_cookie: WSF_COOKIE
 		do
+			create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
 			if
 				attached api.user as l_user and then
 				attached {WSF_STRING} req.cookie (a_oauth20_api.session_token) as l_cookie_token
 			then
 					-- Logout OAuth
-				create l_cookie.make (a_oauth20_api.session_token, l_cookie_token.url_encoded_value)
+				create l_cookie.make (a_oauth20_api.session_token, "DELETED")
 				l_cookie.set_path ("/")
-				l_cookie.set_max_age (-1)
+				l_cookie.set_max_age (0) --| Remove cookie
+				l_cookie.set_expiration_date (create {DATE_TIME}.make_from_epoch (0))
 				res.add_cookie (l_cookie)
 				api.unset_current_user (req)
-
-				create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
-				r.set_status_code ({HTTP_CONSTANTS}.found)
-				r.set_redirection (req.absolute_script_url (""))
-				r.execute
 			else
-				fixme (generator + ": missing else implementation in handle_logout!")
+				debug ("refactor_fixme")
+					fixme (generator + ": missing else implementation in handle_logout!")
+				end
 			end
+			r.set_status_code ({HTTP_CONSTANTS}.found)
+			r.set_redirection (req.absolute_script_url (""))
+			r.execute
 		end
 
 feature {NONE} -- Associate
@@ -315,7 +311,7 @@ feature {NONE} -- Associate
 				create {ARRAYED_LIST [STRING]} l_associated.make (1)
 				create {ARRAYED_LIST [STRING]} l_not_associated.make (1)
 				across l_oauth_api.oauth2_consumers as ic loop
-					if attached l_oauth_api.user_oauth2_by_id (a_user.id, ic.item) then
+					if attached l_oauth_api.user_oauth2_by_user_id (a_user.id, ic.item) then
 						l_associated.force (ic.item)
 					else
 						l_not_associated.force (ic.item)
@@ -332,26 +328,28 @@ feature {NONE} -- Block views
 		local
 			vals: CMS_VALUE_TABLE
 		do
-			if attached smarty_template_block (Current, a_block_id, a_response.api) as l_tpl_block then
-				create vals.make (1)
-					-- add the variable to the block
-				a_response.api.hooks.invoke_value_table_alter (vals, a_response)
-				across
-					vals as ic
-				loop
-					l_tpl_block.set_value (ic.item, ic.key)
-				end
-				if
-					attached oauth20_api as l_auth_api and then
-					attached l_auth_api.oauth2_consumers as l_list
-				then
-					l_tpl_block.set_value (l_list, "oauth_consumers")
-				end
+			if a_response.api.has_permission (perm_use_oauth2_auth) then
+				if attached smarty_template_block (Current, a_block_id, a_response.api) as l_tpl_block then
+					create vals.make (1)
+						-- add the variable to the block
+					a_response.api.hooks.invoke_value_table_alter (vals, a_response)
+					across
+						vals as ic
+					loop
+						l_tpl_block.set_value (ic.item, ic.key)
+					end
+					if
+						attached oauth20_api as l_auth_api and then
+						attached l_auth_api.oauth2_consumers as l_list
+					then
+						l_tpl_block.set_value (l_list, "oauth_consumers")
+					end
 
-				a_response.add_block (l_tpl_block, "content")
-			else
-				debug ("cms")
-					a_response.add_warning_message ("Error with block [" + a_block_id + "]")
+					a_response.add_block (l_tpl_block, "content")
+				else
+					debug ("cms")
+						a_response.add_warning_message ("Error with block [" + a_block_id + "]")
+					end
 				end
 			end
 		end
@@ -364,25 +362,28 @@ feature -- OAuth2 Login with Provider
 			r: CMS_RESPONSE
 			l_oauth: CMS_OAUTH_20_WORKFLOW
 		do
-			if
-				attached {WSF_STRING} req.path_parameter (oauth_callback_path_parameter) as p_consumer and then
-				attached {CMS_OAUTH_20_CONSUMER} a_oauth_api.oauth_consumer_by_name (p_consumer.value) as l_consumer
-			then
-				create l_oauth.make (req.server_url, l_consumer)
-				if attached l_oauth.authorization_url as l_authorization_url then
-					create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
-					r.set_redirection (l_authorization_url)
-					r.execute
+			if api.has_permission (perm_use_oauth2_auth) then
+				if
+					attached {WSF_STRING} req.path_parameter (oauth_callback_path_parameter) as p_consumer and then
+					attached {CMS_OAUTH_20_CONSUMER} a_oauth_api.oauth_consumer_by_name (p_consumer.value) as l_consumer
+				then
+					create l_oauth.make (req.server_url, l_consumer)
+					if attached l_oauth.authorization_url as l_authorization_url then
+						create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
+						r.set_redirection (l_authorization_url)
+					else
+						create {BAD_REQUEST_ERROR_CMS_RESPONSE} r.make (req, res, api)
+						r.set_main_content ("Bad request")
+					end
 				else
 					create {BAD_REQUEST_ERROR_CMS_RESPONSE} r.make (req, res, api)
 					r.set_main_content ("Bad request")
-					r.execute
 				end
 			else
-				create {BAD_REQUEST_ERROR_CMS_RESPONSE} r.make (req, res, api)
-				r.set_main_content ("Bad request")
-				r.execute
+				create {FORBIDDEN_ERROR_CMS_RESPONSE} r.make (req, res, api)
+				r.set_main_content ("You are not allowed to login with " + name + " account!")
 			end
+			r.execute
 		end
 
 	handle_callback_oauth (api: CMS_API; a_oauth_api: CMS_OAUTH_20_API; req: WSF_REQUEST; res: WSF_RESPONSE)
@@ -390,10 +391,12 @@ feature -- OAuth2 Login with Provider
 			r: CMS_RESPONSE
 			l_auth: CMS_OAUTH_20_WORKFLOW
 			l_user_api: CMS_USER_API
-			l_user: CMS_USER
-			l_roles: LIST [CMS_USER_ROLE]
 			l_cookie: WSF_COOKIE
-			es: CMS_AUTHENTICATION_EMAIL_SERVICE
+			l_oauth_id: READABLE_STRING_GENERAL
+			dt: DATE_TIME
+			f: CMS_FORM
+			s: STRING
+			l_max_age: INTEGER
 		do
 			if
 				attached {WSF_STRING} req.path_parameter (oauth_callback_path_parameter) as l_callback and then
@@ -406,84 +409,145 @@ feature -- OAuth2 Login with Provider
 					attached l_auth.access_token as l_access_token and then
 					attached l_auth.user_profile as l_user_profile
 				then
-					create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
 						-- extract user email
-						-- check if the user exist
-					l_user_api := api.user_api
-						-- 1 if the user exit put it in the context
-					if
-						attached l_auth.user_email as l_email
-					then
-						if attached l_user_api.user_by_email (l_email) as p_user then
-								-- User with email exist
-							if	attached a_oauth_api.user_oauth2_by_id (p_user.id, l_consumer.name) then
-									-- Update oauth entry
-								a_oauth_api.update_user_oauth2 (l_access_token.token, l_user_profile, p_user, l_consumer.name )
-							else
-									-- create a oauth entry
-								a_oauth_api.new_user_oauth2 (l_access_token.token, l_user_profile.to_string_32, p_user, l_consumer.name )
-							end
-							create l_cookie.make (a_oauth_api.session_token, l_access_token.token)
-							l_cookie.set_max_age (l_access_token.expires_in)
-							l_cookie.set_path ("/")
-							res.add_cookie (l_cookie)
-						elseif attached a_oauth_api.user_oauth2_by_email (l_email, l_consumer.name) as p_user then
-							a_oauth_api.update_user_oauth2 (l_access_token.token, l_user_profile, p_user, l_consumer.name )
-							create l_cookie.make (a_oauth_api.session_token, l_access_token.token)
-							l_cookie.set_max_age (l_access_token.expires_in)
-							l_cookie.set_path ("/")
-							res.add_cookie (l_cookie)
-						else
-							create {ARRAYED_LIST [CMS_USER_ROLE]} l_roles.make (1)
-							l_roles.force (l_user_api.authenticated_user_role)
-
-								-- Create a new user and oauth entry
-							create l_user.make (l_email)
-							l_user.set_email (l_email)
-							l_user.set_password (new_token) -- generate a random password.
-							l_user.set_roles (l_roles)
-							l_user.mark_active
-							l_user_api.new_user (l_user)
-
-								-- Add oauth entry
-							a_oauth_api.new_user_oauth2 (l_access_token.token, l_user_profile, l_user, l_consumer.name )
-							create l_cookie.make (a_oauth_api.session_token, l_access_token.token)
-							l_cookie.set_max_age (l_access_token.expires_in)
-							l_cookie.set_path ("/")
-							res.add_cookie (l_cookie)
-							api.set_user (l_user)
-							api.record_user_login (l_user)
-
-								-- Send Email
-							create es.make (create {CMS_AUTHENTICATION_EMAIL_SERVICE_PARAMETERS}.make (api))
-							write_debug_log (generator + ".handle_callback_oauth: send_contact_welcome_email")
-							es.send_contact_welcome_email (l_email, l_user, req.absolute_script_url (""))
-						end
+					if attached l_auth.user_login as l_login then
+						l_oauth_id := l_login
+					elseif attached l_auth.user_email as l_email then
+						l_oauth_id := l_email
+					elseif attached l_auth.user_id as l_id then
+						l_oauth_id := l_id
 					end
-					r.set_redirection (r.front_page_url)
-					r.execute
+					if l_oauth_id /= Void then
+							-- check if the user exist
+						l_user_api := api.user_api
+							-- if the user exits put it in the context
+							-- FIXME: what if the email is not available, should it check for unique id such as `id`, `login`, .. if available? [2018-10-18]
+						if attached api.user as l_current_user then
+								-- Try to associate.
+							if api.has_permission (perm_use_oauth2_auth) then
+									-- User with email exist
+								if	attached a_oauth_api.user_oauth2_by_user_id (l_current_user.id, l_consumer.name) as l_oauth_user then
+										-- Update oauth entry
+									create {FORBIDDEN_ERROR_CMS_RESPONSE} r.make (req, res, api)
+									r.set_main_content ("An user is already associated with that " + name + " account!")
+								else
+									create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
+										-- create a oauth entry
+									a_oauth_api.new_user_oauth2 (l_access_token.token, l_user_profile.to_string_32, l_current_user, l_oauth_id, l_consumer.name)
+									r.set_redirection (api.location_absolute_url ("account", Void))
+								end
+							else
+								create {FORBIDDEN_ERROR_CMS_RESPONSE} r.make (req, res, api)
+								r.set_main_content ("You are not allowed to associate with " + name + " account!")
+							end
+						else
+							create l_cookie.make (a_oauth_api.session_token, l_access_token.token)
+							l_cookie.set_path ("/")
+							l_max_age := l_access_token.expires_in
+							if l_max_age <= 0 then
+								l_max_age := a_oauth_api.session_max_age
+								if l_max_age > 0 then
+									l_cookie.set_max_age (l_max_age)
+									create dt.make_now_utc
+									dt.second_add (l_max_age)
+									l_cookie.set_expiration_date (dt)
+								end
+							end
+
+							if
+								attached l_auth.user_email as l_email and then
+								attached l_user_api.user_by_email (l_email) as p_user
+							then
+								if api.user_has_permission (p_user, perm_use_oauth2_auth) then
+									create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
+										-- User with oauth id association exist
+									if	attached a_oauth_api.user_oauth2_by_user_id (p_user.id, l_consumer.name) as l_oauth_user then
+											-- Update oauth entry
+										a_oauth_api.update_user_oauth2 (l_access_token.token, l_user_profile, p_user, l_oauth_id, l_consumer.name )
+									else
+											-- create a oauth entry
+										a_oauth_api.new_user_oauth2 (l_access_token.token, l_user_profile, p_user, l_oauth_id, l_consumer.name )
+									end
+									res.add_cookie (l_cookie)
+									r.set_redirection (r.front_page_url)
+								else
+									create {FORBIDDEN_ERROR_CMS_RESPONSE} r.make (req, res, api)
+									r.set_main_content ("You are not allowed to login with " + name + " account!")
+								end
+							elseif attached a_oauth_api.user_oauth2_by_id (l_oauth_id, l_consumer.name) as p_user then
+								create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
+								a_oauth_api.update_user_oauth2 (l_access_token.token, l_user_profile, p_user, l_oauth_id, l_consumer.name )
+								res.add_cookie (l_cookie)
+								r.set_redirection (r.front_page_url)
+							elseif api.has_permission (perm_account_oauth2_register) then
+								create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
+
+								f := new_registration_form (l_consumer, l_oauth_id, l_access_token, l_auth.user_email, l_user_profile, a_oauth_api)
+								create s.make_empty
+								f.append_to_html (r.wsf_theme, s)
+								r.set_main_content (s)
+							else
+								create {FORBIDDEN_ERROR_CMS_RESPONSE} r.make (req, res, api)
+								r.set_main_content ("You are not allowed to register with " + name + " account!")
+							end
+						end
+					else
+						create {BAD_REQUEST_ERROR_CMS_RESPONSE} r.make (req, res, api)
+						r.add_error_message ("Missing unique oauth id such as email, login, id information!")
+					end
+				else
+					create {BAD_REQUEST_ERROR_CMS_RESPONSE} r.make (req, res, api)
 				end
+			else
+				create {BAD_REQUEST_ERROR_CMS_RESPONSE} r.make (req, res, api)
 			end
+			r.execute
 		end
 
 	handle_associate (api: CMS_API; a_oauth_api: CMS_OAUTH_20_API; req: WSF_REQUEST; res: WSF_RESPONSE)
 		local
 			r: CMS_RESPONSE
+			l_oauth: CMS_OAUTH_20_WORKFLOW
 		do
-			create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
-
-			if req.is_post_request_method then
+			if
+				attached api.user as l_user and then
+				api.has_permission (perm_use_oauth2_auth)
+			then
 				if
-					attached {WSF_STRING} req.form_parameter ("consumer") as l_consumer and then
-					attached {WSF_STRING} req.form_parameter ("email") as l_email and then
-					attached r.user as l_user
+					attached {WSF_STRING} req.form_parameter ("consumer") as p_consumer and then
+					attached {CMS_OAUTH_20_CONSUMER} a_oauth_api.oauth_consumer_by_name (p_consumer.value) as l_consumer
 				then
-					l_user.set_email (api.utf_8_encoded (l_email.value))
-					a_oauth_api.new_user_oauth2 ("none", "none", l_user, l_consumer.value )
-						-- TODO send email?
+					create l_oauth.make (req.server_url, l_consumer)
+					if attached l_oauth.authorization_url as l_authorization_url then
+						create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
+						r.set_redirection (l_authorization_url)
+					else
+						create {BAD_REQUEST_ERROR_CMS_RESPONSE} r.make (req, res, api)
+						r.set_main_content ("Bad request")
+					end
+				else
+					create {BAD_REQUEST_ERROR_CMS_RESPONSE} r.make (req, res, api)
+					r.set_main_content ("Bad request")
 				end
+
+--				create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
+
+--				if req.is_post_request_method then
+--					if
+--						attached {WSF_STRING} req.form_parameter ("consumer") as l_consumer and then
+--						attached {WSF_STRING} req.form_parameter ("email") as l_email and then
+--						attached r.user as l_user
+--					then
+--						l_user.set_email (api.utf_8_encoded (l_email.value))
+--						a_oauth_api.new_user_oauth2 ("none", "none", l_user, l_consumer.value )
+--							-- TODO send email?
+--					end
+--				end
+--				r.set_redirection (req.absolute_script_url ("/account"))
+			else
+				create {FORBIDDEN_ERROR_CMS_RESPONSE} r.make (req, res, api)
+				r.add_error_message ("You are not allowed to associate with " + name + " account!")
 			end
-			r.set_redirection (req.absolute_script_url ("/account"))
 			r.execute
 		end
 
@@ -505,7 +569,196 @@ feature -- OAuth2 Login with Provider
 			r.execute
 		end
 
+feature -- Registration
 
+	new_registration_form (a_consumer: CMS_OAUTH_20_CONSUMER; a_oauth_id: READABLE_STRING_GENERAL; a_access_token: OAUTH_TOKEN;
+				a_oauth_email: detachable READABLE_STRING_8; a_user_profile: READABLE_STRING_8; a_oauth2_api: CMS_OAUTH_20_API): CMS_FORM
+		local
+			tf_hidden: WSF_FORM_HIDDEN_INPUT
+			tf: WSF_FORM_TEXT_INPUT
+			tf_email: WSF_FORM_EMAIL_INPUT
+			fset: WSF_FORM_FIELD_SET
+			l_submit: WSF_FORM_SUBMIT_INPUT
+		do
+			create Result.make (oauth_register_path, "oauth-reg-form")
+			create fset.make
+			fset.set_legend ("Register with " + html_encoded (a_consumer.name) + " account.")
+			Result.extend (fset)
+
+			create tf.make_with_text ("username", a_oauth_id)
+			tf.set_size (70); tf.set_label ("Username")
+			tf.enable_required
+			fset.extend (tf)
+			create tf_email.make ("email")
+			tf_email.set_size (70); tf_email.set_label ("Email address")
+			tf_email.set_description ("Enter a valid email address.")
+			tf_email.set_text_value (a_oauth_email)
+			tf_email.enable_required
+			fset.extend (tf_email)
+
+			create tf.make ("profilename")
+			tf.set_size (70); tf.set_label ("Profile name")
+			tf.set_description ("Optional profile name")
+			fset.extend (tf)
+
+			create tf_hidden.make ("oauth_id")
+			tf_hidden.set_text_value (a_oauth_id)
+			Result.extend (tf_hidden)
+			create tf_hidden.make ("oauth_email")
+			tf_hidden.set_text_value (a_oauth_email)
+			Result.extend (tf_hidden)
+			create tf_hidden.make ("token")
+			tf_hidden.set_text_value (a_access_token.token)
+			Result.extend (tf_hidden)
+			create tf_hidden.make ("consumer")
+			tf_hidden.set_text_value (a_consumer.name)
+			Result.extend (tf_hidden)
+			create tf_hidden.make ("expires_in")
+			tf_hidden.set_text_value (a_access_token.expires_in.out)
+			Result.extend (tf_hidden)
+			create tf_hidden.make ("profile")
+			tf_hidden.set_text_value (a_user_profile)
+			Result.extend (tf_hidden)
+
+			create l_submit.make_with_text ("op", "Register")
+			Result.extend (l_submit)
+		end
+
+	new_empty_registration_form: CMS_FORM
+		local
+			tf_hidden: WSF_FORM_HIDDEN_INPUT
+			tf: WSF_FORM_TEXT_INPUT
+			tf_email: WSF_FORM_EMAIL_INPUT
+			fset: WSF_FORM_FIELD_SET
+		do
+			create Result.make (oauth_register_path, "oauth-reg-form")
+			create fset.make
+			fset.set_legend ("Register with Oauth account.")
+			Result.extend (fset)
+
+			create tf.make ("username")
+			tf.set_size (70); tf.set_label ("Username")
+			tf.enable_required
+			fset.extend (tf)
+			create tf_email.make ("email")
+			tf_email.set_size (70); tf.set_label ("Email address")
+			tf_email.enable_required
+			fset.extend (tf_email)
+			create tf.make ("profilename")
+			tf_email.set_size (70); tf.set_label ("Profile name")
+			fset.extend (tf)
+
+			create tf_hidden.make ("consumer")
+			Result.extend (tf_hidden)
+			create tf_hidden.make ("oauth_id")
+			Result.extend (tf_hidden)
+			create tf_hidden.make ("oauth_email")
+			Result.extend (tf_hidden)
+			create tf_hidden.make ("token")
+			Result.extend (tf_hidden)
+			create tf_hidden.make ("expires_in")
+			Result.extend (tf_hidden)
+			create tf_hidden.make ("profile")
+			Result.extend (tf_hidden)
+		end
+
+
+	handle_register (api: CMS_API; a_oauth_api: CMS_OAUTH_20_API; req: WSF_REQUEST; res: WSF_RESPONSE)
+		local
+			r: CMS_RESPONSE
+			f: CMS_FORM
+		do
+			if req.is_post_request_method then
+				if api.has_permission (perm_account_oauth2_register) then
+					create {GENERIC_VIEW_CMS_RESPONSE} r.make (req, res, api)
+
+					f := new_empty_registration_form
+					f.submit_actions.extend (agent (fd: WSF_FORM_DATA; i_oauth20_api: CMS_OAUTH_20_API; i_res: WSF_RESPONSE; i_r: CMS_RESPONSE)
+							local
+								l_user: CMS_USER
+								l_max_age: INTEGER
+								l_cookie: WSF_COOKIE
+								dt: DATE_TIME
+								es: CMS_AUTHENTICATION_EMAIL_SERVICE
+								l_known_email: BOOLEAN
+							do
+								if
+									attached i_oauth20_api.cms_api.user_api as l_user_api and then
+									attached fd.string_item ("consumer") as l_consumername and then
+									attached i_oauth20_api.oauth_consumer_by_name (l_consumername) as l_consumer and then
+									attached fd.string_item ("oauth_id") as l_oauth_id and then
+									attached fd.string_item ("token") as l_access_token and then
+									attached fd.string_item ("expires_in") as l_expires_in and then
+									attached fd.string_item ("profile") as l_user_profile
+								then
+									if attached fd.string_item ("username") as l_username then
+										if attached l_user_api.user_by_name (l_username) then
+											fd.report_invalid_field ("username", "Username is already taken by another account!")
+										elseif attached fd.string_item ("email") as l_email	then
+											if attached l_user_api.user_by_email (l_email) then
+												fd.report_invalid_field ("email", "Email already associated with another account!")
+											else
+												 	-- FIXME: better verification!
+												 	-- find a way to validate the given email.
+												l_known_email := attached fd.string_item ("oauth_email") as l_oauth_email and then l_oauth_email.is_case_insensitive_equal_general (l_email)
+													-- Create new account !
+													-- Create a new user and oauth entry
+												create l_user.make (l_oauth_id)
+												l_user.set_email (l_email)
+												l_user.set_password (new_token) -- generate a random password.
+												if attached fd.string_item ("profilename") as l_profilename then
+													l_user.set_profile_name (l_profilename)
+												end
+												l_user.mark_active
+												l_user_api.new_user (l_user)
+
+													-- Add oauth entry
+												i_oauth20_api.new_user_oauth2 (l_access_token, l_user_profile, l_user, l_oauth_id, l_consumer.name)
+
+												i_oauth20_api.cms_api.set_user (l_user)
+												i_oauth20_api.cms_api.record_user_login (l_user)
+
+												create l_cookie.make (i_oauth20_api.session_token, l_access_token)
+												l_cookie.set_path ("/")
+												l_max_age := l_expires_in.to_integer
+												if l_max_age <= 0 then
+													l_max_age := i_oauth20_api.session_max_age
+													if l_max_age > 0 then
+														l_cookie.set_max_age (l_max_age)
+														create dt.make_now_utc
+														dt.second_add (l_max_age)
+														l_cookie.set_expiration_date (dt)
+													end
+												end
+
+												i_res.add_cookie (l_cookie)
+												i_r.set_redirection (i_oauth20_api.cms_api.absolute_url ("/account", Void))
+
+													-- Send Email
+												create es.make (create {CMS_AUTHENTICATION_EMAIL_SERVICE_PARAMETERS}.make (i_oauth20_api.cms_api))
+												write_debug_log (generator + ".handle_callback_oauth: send_contact_welcome_email")
+												es.send_contact_welcome_email (l_email, l_user, i_oauth20_api.cms_api.absolute_url ("", Void))
+											end
+										else
+											fd.report_invalid_field ("email", "Missing email information!")
+										end
+									else
+										fd.report_invalid_field ("username", "Missing username information!")
+									end
+								else
+									fd.report_error ("Invalid form data!")
+								end
+							end(?, a_oauth_api, res, r)
+						);
+					f.process (r)
+				else
+					create {FORBIDDEN_ERROR_CMS_RESPONSE} r.make (req, res, api)
+				end
+			else
+				create {BAD_REQUEST_ERROR_CMS_RESPONSE} r.make (req, res, api)
+			end
+			r.execute
+		end
 
 feature {NONE} -- Token Generation
 
@@ -527,37 +780,6 @@ feature {NONE} -- Token Generation
 			end
 			Result := l_token
 		end
-
-feature {NONE} -- Implementation: date and time
-
-	http_date_format_to_date (s: READABLE_STRING_8): detachable DATE_TIME
-		local
-			d: HTTP_DATE
-		do
-			create d.make_from_string (s)
-			if not d.has_error then
-				Result := d.date_time
-			end
-		end
-
-	file_date (p: PATH): DATE_TIME
-		require
-			path_exists: (create {FILE_UTILITIES}).file_path_exists (p)
-		local
-			f: RAW_FILE
-		do
-			create f.make_with_path (p)
-			Result := timestamp_to_date (f.date)
-		end
-
-	timestamp_to_date (n: INTEGER): DATE_TIME
-		local
-			d: HTTP_DATE
-		do
-			create d.make_from_timestamp (n)
-			Result := d.date_time
-		end
-
 
 note
 	copyright: "Copyright (c) 1984-2013, Eiffel Software and others"

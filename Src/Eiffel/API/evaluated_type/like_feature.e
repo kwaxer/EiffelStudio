@@ -1,9 +1,9 @@
-note
+﻿note
 	description: "Class for an staticed type on a feature."
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
 	date: "$Date$"
-	revision: "$Revision $"
+	revision: "$Revision$"
 
 class
 	LIKE_FEATURE
@@ -14,6 +14,7 @@ inherit
 			dispatch_anchors,
 			evaluated_type_in_descendant,
 			initialize_info,
+			is_expanded_creation_possible,
 			is_explicit,
 			is_syntactically_equal,
 			update_dependance
@@ -86,11 +87,17 @@ feature -- Status Report
 			-- Is type fixed at compile time without anchors or formals?
 		do
 			if system.in_final_mode then
-				initialize_info (shared_create_info)
+				initialize_info
 				Result := shared_create_info.is_explicit
 			else
 				Result := False
 			end
+		end
+
+	is_expanded_creation_possible: BOOLEAN
+			-- <Precursor>
+		do
+			Result := attached actual_type as a and then a.is_expanded implies a.is_expanded_creation_possible
 		end
 
 feature {COMPILER_EXPORTER} -- Implementation: Access
@@ -139,10 +146,9 @@ feature -- Access
 
 feature -- Generic conformance
 
-	initialize_info (an_info: like shared_create_info)
+	initialize_info
 		do
-				-- FIXME: Should we use `make' or just `set_info'?
-			an_info.make (feature_id, routine_id)
+			shared_create_info.make (feature_id, routine_id)
 		end
 
 	create_info: CREATE_FEAT
@@ -244,7 +250,7 @@ feature -- Comparison
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2013, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "Basic classes in a system"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
@@ -13,7 +13,7 @@ feature -- Generation type
 		deferred
 		end
 
-feature -- Access
+feature -- Classes from the configutation point of view
 
 	any_class: CLASS_I
 	system_object_class: EXTERNAL_CLASS_I
@@ -53,6 +53,12 @@ feature -- Access
 
 	string_32_class: CLASS_I
 			-- Class STRING_32
+
+	immutable_string_8_class: CLASS_I
+			-- Class IMMUTABLE_STRING_8
+
+	immutable_string_32_class: CLASS_I
+			-- Class IMMUTABLE_STRING_32
 
 	array_class: CLASS_I
 			-- Class ARRAY
@@ -95,7 +101,7 @@ feature -- Access
 	exception_class: CLASS_I
 			-- Class EXCEPTION
 
-feature -- Access
+feature -- Classes from the type system of view
 
 	ancestor_class_to_all_classes_id: INTEGER
 		do
@@ -211,6 +217,28 @@ feature -- Access
 			valid_result: Result > 0
 		end
 
+	immutable_string_8_id: INTEGER
+			-- Id of class IMMUTABLE_STRING_8
+		require
+			immutable_string_8_class_exists: immutable_string_8_class /= Void
+			compiled: immutable_string_8_class.is_compiled
+		do
+			Result := immutable_string_8_class.compiled_class.class_id
+		ensure
+			valid_result: Result > 0
+		end
+
+	immutable_string_32_id: INTEGER
+			-- Id of class IMMUTABLE_STRING_32
+		require
+			immutable_string_32_class_exists: immutable_string_32_class /= Void
+			compiled: immutable_string_32_class.is_compiled
+		do
+			Result := immutable_string_32_class.compiled_class.class_id
+		ensure
+			valid_result: Result > 0
+		end
+
 	special_id: INTEGER
 			-- Id of class SPECIAL
 		require
@@ -236,8 +264,7 @@ feature -- Access
 	routine_class_id: INTEGER
 			-- Id of class ROUTINE
 		require
-			routine_class_exists: routine_class /= Void
-			compiled: routine_class.is_compiled
+			is_routine_class_compiled: attached routine_class as c and then c.is_compiled
 		do
 			Result := routine_class.compiled_class.class_id
 		ensure
@@ -247,8 +274,7 @@ feature -- Access
 	procedure_class_id: INTEGER
 			-- Id of class PROCEDURE
 		require
-			procedure_class_exists: procedure_class /= Void
-			compiled: procedure_class.is_compiled
+			is_procedure_class_compiled: attached procedure_class as c and then c.is_compiled
 		do
 			Result := procedure_class.compiled_class.class_id
 		ensure
@@ -258,8 +284,7 @@ feature -- Access
 	function_class_id: INTEGER
 			-- Id of class FUNCTION
 		require
-			function_class_exists: function_class /= Void
-			compiled: function_class.is_compiled
+			is_function_class_compiled: attached function_class as c and then c.is_compiled
 		do
 			Result := function_class.compiled_class.class_id
 		ensure
@@ -269,8 +294,7 @@ feature -- Access
 	predicate_class_id: INTEGER
 			-- Id of class PREDICATE
 		require
-			predicate_class_exists: predicate_class /= Void
-			compiled: predicate_class.is_compiled
+			is_predicate_class_compiled: attached predicate_class as c and then c.is_compiled
 		do
 			Result := predicate_class.compiled_class.class_id
 		ensure
@@ -358,6 +382,52 @@ feature -- Status report
 
 feature -- Settings
 
+	reset_all
+			-- Reset all information about the system.
+		do
+			any_class := Void
+			arguments_class := Void
+			array_class := Void
+			boolean_class := Void
+			character_32_class := Void
+			character_8_class := Void
+			disposable_class := Void
+			exception_class := Void
+			function_class := Void
+			integer_16_class := Void
+			integer_32_class := Void
+			integer_64_class := Void
+			integer_8_class := Void
+			ise_exception_manager_class := Void
+			native_array_class := Void
+			natural_16_class := Void
+			natural_32_class := Void
+			natural_64_class := Void
+			natural_8_class := Void
+			pointer_class := Void
+			predicate_class := Void
+			procedure_class := Void
+			real_32_class := Void
+			real_64_class := Void
+			routine_class := Void
+			rt_extension_class := Void
+			special_class := Void
+			string_32_class := Void
+			immutable_string_32_class := Void
+			string_8_class := Void
+			immutable_string_8_class := Void
+			system_exception_type_class := Void
+			system_object_class := Void
+			system_string_class := Void
+			system_type_class := Void
+			system_value_type_class := Void
+			tuple_class := Void
+			type_class := Void
+			typed_pointer_class := Void
+		ensure
+			not attached any_class
+		end
+
 	set_any_class (c: CLASS_I)
 			-- Assign `c' to `any_class'.
 		require
@@ -373,13 +443,10 @@ feature -- Settings
 			-- Assign `c' to `system_object_class
 		require
 			c_not_void: c /= Void
-		local
-			l_ext: EXTERNAL_CLASS_I
 		do
 			c.set_as_basic_class
-			l_ext ?= c
-			if l_ext /= Void then
-				system_object_class := l_ext
+			if attached {EXTERNAL_CLASS_I} c as e then
+				system_object_class := e
 			end
 		ensure
 			system_object_class_set: c.is_external_class implies system_object_class = c
@@ -389,13 +456,10 @@ feature -- Settings
 			-- Assign `c' to `system_value_type_class
 		require
 			c_not_void: c /= Void
-		local
-			l_ext: EXTERNAL_CLASS_I
 		do
 			c.set_as_basic_class
-			l_ext ?= c
-			if l_ext /= Void then
-				system_value_type_class := l_ext
+			if attached {EXTERNAL_CLASS_I} c as e then
+				system_value_type_class := e
 			end
 		ensure
 			system_object_class_set: c.is_external_class implies system_value_type_class = c
@@ -405,13 +469,10 @@ feature -- Settings
 			-- Assign `c' to `set_system_exception_type_class'
 		require
 			c_not_void: c /= Void
-		local
-			l_ext: EXTERNAL_CLASS_I
 		do
 			c.set_as_basic_class
-			l_ext ?= c
-			if l_ext /= Void then
-				system_exception_type_class := l_ext
+			if attached {EXTERNAL_CLASS_I} c as e then
+				system_exception_type_class := e
 			end
 		ensure
 			system_exception_class_set: c.is_external_class implies system_exception_type_class = c
@@ -528,6 +589,23 @@ feature -- Settings
 		ensure
 			string_32_class_set: n = 32 implies string_32_class = c
 			string_8_class_set: n = 8 implies string_8_class = c
+		end
+
+	set_immutable_string_class (c: CLASS_I; n: INTEGER)
+			-- Assign `c' to `immutable_string_n_class'.
+		require
+			c_not_void: c /= Void
+			n_valid: n = 8 or n = 32
+		do
+			c.set_as_basic_class
+			if n = 32 then
+				immutable_string_32_class := c
+			else
+				immutable_string_8_class := c
+			end
+		ensure
+			immutable_string_32_class_set: n = 32 implies immutable_string_32_class = c
+			immutable_string_8_class_set: n = 8 implies immutable_string_8_class = c
 		end
 
 	set_system_string_class (c: CLASS_I)
@@ -719,7 +797,7 @@ feature -- Settings: Exception
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2015, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[
@@ -750,4 +828,4 @@ note
 			Customer support http://support.eiffel.com
 		]"
 
-end -- class BASIC_SYSTEM_I
+end

@@ -1,26 +1,34 @@
 #!/bin/sh
 
+if [ ! "$STUDIO_VERSION_MAJOR_MINOR" ]; then
+	STUDIO_VERSION_MAJOR_MINOR=19.08
+fi
+
 # File in which the status of the installation generation is logged
 INSTALL_LOG=`pwd`/install.log
 # File in which the status of the installation compilation is logged
 COMPILE_LOG=`pwd`/compile.log
 # Where the new delivery is set up. Warning: this directory is erased!
-INSTALL_DIR=`pwd`/Eiffel_18.11
+INSTALL_DIR=`pwd`/Eiffel_$STUDIO_VERSION_MAJOR_MINOR
 # Where the final delivery is set up (local machine). Warning: directory erased too!
-FINAL_INSTALL_DIR=`pwd`/Eiffel_18.11
+FINAL_INSTALL_DIR=`pwd`/Eiffel_$STUDIO_VERSION_MAJOR_MINOR
 # Where documentation will be generated
 DOCUMENT_DIR=`pwd`
 # Where all.tar.bz2 files should be stored
 EXPORT_DIR=`pwd`/PorterPackage
 # What tag to use to CVS export everything
-DEFAULT_ISE_SVN=svn://$LOGNAME@svn.ise/ise_svn/trunk
-DEFAULT_ORIGO_SVN_ROOT=https://svn.eiffel.com/eiffelstudio
+if [ ! "$DEFAULT_ISE_SVN" ]; then
+	DEFAULT_ISE_SVN=svn://$LOGNAME@svn.ise/ise_svn/trunk
+fi
+if [ ! "$DEFAULT_ORIGO_SVN_ROOT" ]; then
+	DEFAULT_ORIGO_SVN_ROOT=https://svn.eiffel.com/eiffelstudio
+fi
 DEFAULT_ORIGO_SVN=$DEFAULT_ORIGO_SVN_ROOT/trunk
 # This section is commented out be cause it won't work on non-bash shell
 # we use the other one while waiting for a better solution
 #if [ ! "$ORIGO_SVN_REVISION" ]; then
 #	mkdir -p /tmp/eiffelstudio_revision
-#	svn co $DEFAULT_ORIGO_SVN_ROOT/revision /tmp/eiffelstudio_revision	
+#	svn checkout --config-option config:miscellany:use-commit-times=yes $DEFAULT_ORIGO_SVN_ROOT/revision /tmp/eiffelstudio_revision	
 #	ORIGO_SVN_REVISION=$(svnversion /tmp/eiffelstudio_revision)
 #fi
 if [ ! "$ORIGO_SVN_REVISION" ]; then
@@ -125,11 +133,11 @@ exit 1
 # SVN Commands: checkout, export
 co ()
 {
-until  svn co $* >> $INSTALL_LOG; do echo "svn co $* failed, retrying..."; done
+until  svn checkout --config-option config:miscellany:use-commit-times=yes $* >> $INSTALL_LOG; do echo "svn checkout .. $* failed, retrying..."; done
 }
 exprt ()
 {
-until  svn --force export $* >> $INSTALL_LOG; do echo "svn export $* failed, retrying..."; done
+until  svn --force export --config-option config:miscellany:use-commit-times=yes $* >> $INSTALL_LOG; do echo "svn export .. $* failed, retrying..."; done
 }
 
 # C Compilation

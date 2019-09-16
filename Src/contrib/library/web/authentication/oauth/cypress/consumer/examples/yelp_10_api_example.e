@@ -14,11 +14,9 @@ feature {NONE} -- Initialization
 
 	make
 		local
-			config : OAUTH_CONFIG
 			api_service : OAUTH_SERVICE_I
 			request : OAUTH_REQUEST
 			access_token: OAUTH_TOKEN
-			signature: OAUTH_SIGNATURE_TYPE
 			api_builder: API_BUILDER
 		do
 			create api_builder
@@ -37,7 +35,7 @@ feature {NONE} -- Initialization
   		  	 -- Looking for any restaurants
   				request.add_query_string_parameter("category", "restaurants")
 			  api_service.sign_request (access_token, request)
-	    	  if attached {OAUTH_RESPONSE} request.execute as l_response then
+	    	  if attached request.execute as l_response then
 					print ("%NOk, let see what we found...")
 					print ("%NResponse: STATUS" + l_response.status.out)
 					if attached l_response.body as l_body then
@@ -56,7 +54,7 @@ feature {NONE} -- Implementation
 	empty_token : detachable  OAUTH_TOKEN
 
 ;note
-	copyright: "2013-2013, Javier Velilla, Jocelyn Fiat, Eiffel Software and others"
+	copyright: "2013-2019, Javier Velilla, Jocelyn Fiat, Eiffel Software and others"
 	license: "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software

@@ -28,7 +28,9 @@ inherit
 			text_not_supported,
 			exec_proc_not_supported,
 			is_convert_string_type_required,
-			is_connection_string_supported
+			is_connection_string_supported,
+			is_affected_row_count_supported,
+			affected_row_count
 		end
 
 	DISPOSABLE
@@ -86,6 +88,7 @@ feature -- For DATABASE_CHANGE
 
 	pre_immediate (descriptor, i: INTEGER)
 		do
+			affected_row_count := 0
 			odbc_pre_immediate (con_context_pointer, descriptor, i)
 			update_status
 		end
@@ -418,12 +421,9 @@ feature -- For DATABASE_PROC
 	support_drop_proc: BOOLEAN
 		local
 			l_sql_string: ODBC_SQL_STRING
-			l_string: STRING
 		do
 			create l_sql_string.make_by_pointer (odbc_procedure_term (con_context_pointer))
-			l_string := l_sql_string.string.as_string_8
-			Result :=
-				l_string.is_case_insensitive_equal (once "stored procedure")
+			Result := l_sql_string.string.is_case_insensitive_equal_general (once "stored procedure")
 		end
 
 	drop_proc_not_supported
@@ -557,6 +557,7 @@ feature -- External
 			c_temp: ODBC_SQL_STRING
 		do
 			create c_temp.make (command)
+			affected_row_count := 0
 			odbc_init_order (con_context_pointer, no_descriptor, c_temp.item, c_temp.count, 0)
 			update_status
 		end
@@ -587,6 +588,7 @@ feature -- External
 			if l_para /= Void then
 				l_para.release
 			end
+			affected_row_count := odbc_row_count (con_context_pointer, no_descriptor)
 			odbc_terminate_order (con_context_pointer, no_descriptor)
 			update_status
 		end
@@ -850,6 +852,16 @@ feature -- External
 			Result := odbc_support_proc = 1
 		end
 
+
+	is_affected_row_count_supported: BOOLEAN
+			-- Is `affected_row_count' supported?
+		do
+			Result := True
+		end
+
+	affected_row_count: INTEGER
+			-- The number of rows changed, deleted, or inserted by the last statement.
+
 feature {NONE} -- Access
 
 	con_context_pointer: POINTER
@@ -892,6 +904,12 @@ feature {NONE} -- Disposal
 		end
 
 feature {NONE} -- External features
+
+	odbc_row_count (a_handle: POINTER; no_descriptor: INTEGER): INTEGER
+			-- Number of affected rows
+		external
+			"C use %"odbc.h%""
+		end
 
 	odbc_get_error_message (a_con: POINTER): POINTER
 			-- C buffer which contains the error_message.
@@ -1455,7 +1473,7 @@ feature {NONE} -- External features
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software and others"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software and others"
 	license:	"Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software
@@ -1464,9 +1482,6 @@ note
 			Website http://www.eiffel.com
 			Customer support http://support.eiffel.com
 		]"
-
-
-
 
 end -- class ODBC
 

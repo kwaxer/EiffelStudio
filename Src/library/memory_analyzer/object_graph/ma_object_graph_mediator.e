@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "Analyze the objects in the memory on a graph"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
@@ -69,7 +69,6 @@ feature -- Command
 			a_object_not_void : a_object /= Void
 		local
 			l_obj_with_node : TUPLE [obj: ANY; node: EG_NODE]
-			l_result: detachable like find_draw_node_by_object
 		do
 			from
 				objects_already_draw.start
@@ -156,7 +155,7 @@ feature -- Command
 			ay_not_large_or_small: ay >= 0 and ay <= 2000
 		local
 			fig: detachable EG_FIGURE
-			l_intro : STRING
+			l_intro : READABLE_STRING_32
 			l_tuple: TUPLE [obj: ANY; node: EG_NODE]
 			l_last_drawn_node: like last_drawn_node
 		do
@@ -167,9 +166,9 @@ feature -- Command
 
 			l_intro := a_object.out
 			if l_intro.count > 20 then
-				l_intro := internal.type_name (a_object)
+				l_intro := internal.type_name_32 (a_object)
 			end
-			l_last_drawn_node.set_name (node_counter.out + " : " + l_intro)
+			l_last_drawn_node.set_name_32 (node_counter.out.to_string_32 + " : " + l_intro)
 			graph.add_node (l_last_drawn_node)
 
 			fig := world.figure_from_model (l_last_drawn_node)
@@ -299,25 +298,23 @@ feature -- Implementation for agents
 			world.update
 		end
 
-	find_object_by_type_name (a_type_name: STRING)
+	find_object_by_type_name (a_type_name: READABLE_STRING_32)
 			-- Find all the objects in the system which type is "a_type_name".
 		local
 			l_temp: detachable ANY
 			l_information: EV_INFORMATION_DIALOG
 		do
-			l_temp := object_finder.find_objects_by_type_name (a_type_name)
+			l_temp := object_finder.find_objects_by_type_name ({UTF_CONVERTER}.string_32_to_utf_8_string_8 (a_type_name))
 			if l_temp = Void then
-				create l_information.make_with_text ("object with type name "+a_type_name+" not found.")
+				create l_information.make_with_text ({STRING_32} "object with type name "+a_type_name+" not found.")
 				l_information.show_relative_to_window (main_window)
 			elseif object_already_draw (l_temp) then
-				create l_information.make_with_text ("object with type name "+a_type_name+" already exist on the graph.")
+				create l_information.make_with_text ({STRING_32} "object with type name "+a_type_name+" already exist on the graph.")
 				l_information.show_relative_to_window (main_window)
 			else
-				add_objects_of_same_type (a_type_name)
+				add_objects_of_same_type ({UTF_CONVERTER}.string_32_to_utf_8_string_8 (a_type_name))
 			end
 		end
-
-
 
 	zoom_changed (a_value:INTEGER)
 			-- Change the graph size base on the zoom value.
@@ -328,26 +325,24 @@ feature -- Implementation for agents
 			last_zoom_value := a_value
 		end
 
-	find_object_by_instance_name (a_object_name: STRING)
+	find_object_by_instance_name (a_object_name: READABLE_STRING_32)
 			-- Find all the objects which name (the field name) is a_object_name then put then all on the graph.
 		local
-			l_object: detachable ANY
 			l_information: EV_INFORMATION_DIALOG
 			object_drawed: BOOLEAN
 		do
-			l_object := object_finder.find_objects_by_object_name (a_object_name)
-			if l_object /= Void then
+			if attached object_finder.find_objects_by_object_name ({UTF_CONVERTER}.string_32_to_utf_8_string_8 (a_object_name)) as l_object then
 				--check if the graph already draw
 				object_drawed := object_already_draw (l_object)
 				if not object_drawed then
 					clear_graph
 					add_node (random.next_item_in_range (0, object_drawing.width), random.next_item_in_range (0, object_drawing.height), l_object.generating_type)
 				else
-					create l_information.make_with_text ("The object with name %"" + a_object_name + "%" already in the graph.")
+					create l_information.make_with_text ({STRING_32} "The object with name %"" + a_object_name + "%" already in the graph.")
 					l_information.show_relative_to_window (main_window)
 				end
 			else
-				create l_information.make_with_text ("The object with name %"" + a_object_name + "%" not found.")
+				create l_information.make_with_text ({STRING_32} "The object with name %"" + a_object_name + "%" not found.")
 				l_information.show_relative_to_window (main_window)
 			end
 		end
@@ -424,7 +419,6 @@ feature {NONE} -- Low Level Logic Implementation
 		local
 			l_type_key: INTEGER
 			l_data: detachable ARRAYED_LIST[ANY]
-			l_row_index: INTEGER
 			l_item: ANY
 		do
 			l_type_key:= object_finder.find_key_for_type (a_type_name)
@@ -494,7 +488,7 @@ invariant
 	objects_already_draw_has_no_void_item: True-- No Void items in `objects_already_draw'
 
 note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software and others"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software and others"
 	license:	"Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software
@@ -503,8 +497,5 @@ note
 			Website http://www.eiffel.com
 			Customer support http://support.eiffel.com
 		]"
-
-
-
 
 end

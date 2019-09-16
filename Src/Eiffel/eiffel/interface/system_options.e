@@ -13,8 +13,8 @@ inherit
 
 feature -- Access
 
-	remover_off: BOOLEAN
-			-- Is the remover off (by specifying the Ace option)
+	dead_code: like {CONF_TARGET_OPTION}.dead_code_index_all
+			-- The index indicating what code should be removed.
 
 	absent_explicit_assertion: BOOLEAN
 			-- Can assertions be derived from the code rather than taken solely from the assertion clauses?
@@ -22,8 +22,8 @@ feature -- Access
 	array_optimization_on: BOOLEAN
 			-- Is array optimization on?
 
-	inlining_on: BOOLEAN;
-			-- Is inlining on ?
+	inlining_on: BOOLEAN
+			-- Is inlining on?
 
 	inlining_size: INTEGER
 			-- Size of the feature which will be inlined.
@@ -73,16 +73,19 @@ feature -- Access
 			Result := concurrency_index = {CONF_TARGET_OPTION}.concurrency_index_scoop
 		end
 
+	void_safety_index: like {CONF_TARGET_OPTION}.void_safety_index_none
+			-- Current void_safety index.			
+
 	has_old_verbatim_strings: BOOLEAN
 			-- Is old semantics of verbatim strings used?
 
 	has_old_feature_replication: BOOLEAN
 			-- Is old semantics for feature replication used?
 
-	exception_stack_managed: BOOLEAN;
+	exception_stack_managed: BOOLEAN
 			-- Is the exception stack managed in final mode
 
-	has_expanded: BOOLEAN;
+	has_expanded: BOOLEAN
 			-- Is there an expanded declaration in the system,
 			--| i.e. some extra check must be done after pass2 ?
 
@@ -402,14 +405,6 @@ feature -- Update
 			array_optimization_on_set: array_optimization_on = b
 		end
 
-	set_remover_off (b: BOOLEAN)
-			-- Assign `b' to `remover_off'
-		do
-			remover_off := b
-		ensure
-			remover_off_set: remover_off = b
-		end
-
 	set_exception_stack_managed (b: BOOLEAN)
 		do
 			exception_stack_managed := b
@@ -442,6 +437,14 @@ feature -- Update
 			concurrency_index := v
 		ensure
 			concurrency_index_set: concurrency_index = v
+		end
+
+	set_void_safety_index (v: like void_safety_index)
+			-- Set `void_safety' to `v'.
+		do
+			void_safety_index := v
+		ensure
+			void_safety_set: void_safety_index = v
 		end
 
 	set_has_old_verbatim_strings (b: BOOLEAN)
@@ -626,7 +629,7 @@ feature {SYSTEM_I} -- Implementation
 			-- Is the system a multithreaded one?
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

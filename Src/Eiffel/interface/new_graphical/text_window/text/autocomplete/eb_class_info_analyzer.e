@@ -3,6 +3,7 @@
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
 	author: "Etienne Amodeo"
+	revised_by: "Alexander Kogtenkov"
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -318,10 +319,9 @@ feature {NONE} -- Click ast exploration
 			if not retried then
 				if not c.is_precompiled and c.file_is_readable then
 					last_syntax_error := Void
-					check
-						not_error_handler_has_error: not error_handler.has_error
-					end
 					if attached {EIFFEL_CLASS_C} c as l_eiffel_class then
+							-- Clear error handler, as per-note in parsed_ast.
+						error_handler.wipe_out
 						current_class_as := l_eiffel_class.parsed_ast (after_save)
 					else
 						check is_eiffel_class: False end
@@ -334,7 +334,7 @@ feature {NONE} -- Click ast exploration
 							last_syntax_error := l_syn
 						end
 					end
-						-- Clear error handler, as per-note in parsed_ast
+						-- Clear error handler, as per-note in parsed_ast.
 					error_handler.wipe_out
 				else
 						-- Class is precompiled, we should not reparse it since its definition
@@ -414,11 +414,11 @@ feature {NONE}-- Clickable/Editable implementation
 			line_not_void: line /= Void
 			token_in_line: line.has_token (token)
 		local
-			l_type: TYPE_A
 			vn: READABLE_STRING_32
 			vn_id: INTEGER
 			td: detachable AST_EIFFEL
 			l_precursor_feat: detachable E_FEATURE
+			l_type: like type_from
 		do
 			if is_ok_for_completion then
 				initialize_context
@@ -789,7 +789,6 @@ feature {NONE} -- Implementation (`type_from')
 		local
 			l_feature_state: TUPLE [feature_item: E_FEATURE; class_type_of_feature: CL_TYPE_A; features_found_count: INTEGER; constraint_position: INTEGER]
 			feat: E_FEATURE
-			type: TYPE_A
 			l_pos: INTEGER
 			l_named_tuple_type: NAMED_TUPLE_TYPE_A
 			l_processed_class: CLASS_C
@@ -805,7 +804,7 @@ feature {NONE} -- Implementation (`type_from')
 						-- There's no feature with the name `a_name' in the type set.
 					feat := Void
 				elseif	l_feature_state.features_found_count = 1 then
-						-- We found exactly one feautre, this is good.
+						-- We found exactly one feature, this is good.
 						-- Let's store the class type to which the feature belongs into `last_target_type'.
 					feat := l_feature_state.feature_item
 					last_target_type := l_feature_state.class_type_of_feature
@@ -815,9 +814,7 @@ feature {NONE} -- Implementation (`type_from')
 					feat := Void
 				end
 				if feat /= Void and then feat.type /= Void then
-					type := feat.type
-				else
-					type := Void
+					Result := feat.type
 				end
 			else
 				check
@@ -830,16 +827,15 @@ feature {NONE} -- Implementation (`type_from')
 					l_processed_class /= Void and then l_processed_class.has_feature_table
 					or l_named_tuple_type /= Void
 				then
-					type := Void
 					if l_named_tuple_type /= Void then
 						l_pos := l_named_tuple_type.label_position (a_name)
 						if l_pos > 0 then
-							type := l_named_tuple_type.generics.i_th (l_pos)
+							Result := l_named_tuple_type.generics.i_th (l_pos)
 						end
-						if type = Void then
+						if Result = Void then
 							feat := l_processed_class.feature_with_name_32 (a_name)
 							if feat /= Void then
-								type := feat.type
+								Result := feat.type
 							end
 						end
 					else
@@ -849,13 +845,12 @@ feature {NONE} -- Implementation (`type_from')
 							feat := feature_of_constaint_renamed (last_formal, a_name)
 						end
 						if feat /= Void then
-							type := feat.type
+							Result := feat.type
 						end
 					end
 				end
 			end
 			last_feature := feat
-			Result := type
 		end
 
 	move_to_next_target (a_type, a_parent_type: TYPE_A; a_class: CLASS_C)
@@ -1265,7 +1260,7 @@ feature {NONE}-- Implementation
 					stop := False
 					error := exp.after
 					if not error then
-						if token_image_is_same_as_word (exp.item, Opening_parenthesis) then
+						if token_image_is_same_as_word (exp.item, Opening_parenthesis)	then
 								-- if there is a parenthesis, we fill the new `sub_exp' with what's inside
 							from
 								par_cnt := 1
@@ -1786,40 +1781,24 @@ feature {NONE}-- Implementation
 			a_name_attached: a_name /= Void
 			not_a_name_is_empty: not a_name.is_empty
 		local
-			l_token: EDITOR_TOKEN
-			l_line: EDITOR_LINE
-			l_name: STRING_32
-			l_analyzer: attached ES_EDITOR_CLASS_ANALYZER
-			l_result: detachable ES_EDITOR_ANALYZER_STATE_INFO
-			l_locals: attached HASH_TABLE [detachable TYPE_A, STRING_32]
-			l_feature: like current_feature_i
-			l_class: like current_class_c
 			retried: BOOLEAN
 		do
-			if not retried then
-				l_feature := current_feature_i
-				l_class := current_class_c
-				if l_feature /= Void and then l_class /= Void and then a_name /= Void and then not a_name.is_empty then
-					l_token := current_token
-					l_line := current_line
-					if l_token /= Void and then l_line /= Void then
-						create l_analyzer.make_with_feature (l_class, l_feature)
-						l_result := l_analyzer.scan (l_token, l_line)
-						if l_result /= Void and then l_result.has_current_frame then
-							l_locals := l_result.current_frame.all_locals
-							l_name := a_name.as_string_32
-							if l_locals.has (l_name) then
-								Result := l_locals.item (l_name)
-							end
-						else
-							if attached {HASH_TABLE [detachable TYPE_A, STRING_32]} locals_from_local_entities_finder as l_found_locals then
-								l_name := a_name.as_string_32
-								if l_found_locals.has (l_name) then
-									Result := l_found_locals.item (l_name)
-								end
-							end
-						end
-					end
+			if
+				not retried and then
+				attached current_feature_i as l_feature and then
+				attached current_class_c as l_class and then
+				attached a_name and then
+				not a_name.is_empty and then
+				attached current_token as l_token and then
+				attached current_line as l_line
+			then
+				if
+					attached (create {ES_EDITOR_CLASS_ANALYZER}.make_with_feature (l_class, l_feature)).scan (l_token, l_line) as l_result and then
+					l_result.has_current_frame
+				then
+					Result := l_result.current_frame.all_locals.item (a_name.as_string_32)
+				elseif attached locals_from_local_entities_finder as l_found_locals then
+					Result := l_found_locals.item (a_name.as_string_32)
 				end
 			end
 		rescue
@@ -1827,7 +1806,7 @@ feature {NONE}-- Implementation
 			retry
 		end
 
-	locals_from_local_entities_finder: HASH_TABLE [detachable TYPE_A, attached STRING_32]
+	locals_from_local_entities_finder: detachable HASH_TABLE [detachable TYPE_A, attached STRING_32]
 			-- Stack entities from finder
 			--| could be finder from AST for instance
 			-- i.e: Locals,arguments,object test locals
@@ -2250,15 +2229,13 @@ feature {NONE} -- Implementation
 
 	current_feature_i: detachable FEATURE_I
 			-- Current feature_i
-		local
-			l_current_class_c: detachable CLASS_C
 		do
-			l_current_class_c := current_class_c
-			if l_current_class_c /= Void then
-				if l_current_class_c.has_feature_table then
-					if current_feature_as /= Void then
-						Result := l_current_class_c.feature_of_name_id (current_feature_as.name.internal_name.name_id)
-					end
+			if attached current_class_c as l_current_class_c then
+				if
+					l_current_class_c.has_feature_table and then
+					attached current_feature_as as a
+				then
+					Result := l_current_class_c.feature_of_name_id (a.name.internal_name.name_id)
 				end
 					-- We hack here to avoid current feature void.
 					-- type_a_checker only need a feature for like_argument checking.
@@ -2396,19 +2373,19 @@ feature {EB_COMPLETION_POSSIBILITIES_PROVIDER} -- Constants
 			Result := <<":=", "?=", ";", ",">>
 		end
 
-	infix_groups: LINKED_LIST [ARRAY [STRING]]
+	infix_groups: LINKED_LIST [ARRAY [READABLE_STRING_32]]
 			-- list of operators groups, sorted by priority
 		once
 			create Result.make
-			Result.extend (<<"@">>)
-			Result.extend (<<"^">>)
-			Result.extend (<<"*", "/", "//", "\\">>)
-			Result.extend (<<"+", "-">>)
-			Result.extend (<<"/=", "=", ">", ">=", "<", "<=">>)
-			Result.extend (<<"and">>)
-			Result.extend (<<"xor">>)
-			Result.extend (<<"or">>)
-			Result.extend (<<"implies">>)
+			Result.extend (<<{STRING_32} "@">>)
+			Result.extend (<<{STRING_32} "^">>)
+			Result.extend (<<{STRING_32} "*", {STRING_32} "/", {STRING_32} "//", {STRING_32} "\\">>)
+			Result.extend (<<{STRING_32} "+", {STRING_32} "-">>)
+			Result.extend (<<{STRING_32} "/=", {STRING_32} "=", {STRING_32} ">", {STRING_32} ">=", {STRING_32} "<", {STRING_32} "<=">>)
+			Result.extend (<<{STRING_32} "and">>)
+			Result.extend (<<{STRING_32} "xor">>)
+			Result.extend (<<{STRING_32} "or">>)
+			Result.extend (<<{STRING_32} "implies">>)
 		end
 
 invariant

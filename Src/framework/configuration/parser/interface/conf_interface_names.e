@@ -517,7 +517,7 @@ feature -- Misc
 		end
 	remove_remote_target (a_target, a_location: READABLE_STRING_GENERAL): STRING_32
 		do
-			Result := locale.formatted_string (locale.translation ("Are you sure you want to remove remote $1 ($2)?"), [a_target, a_location])
+			Result := locale.formatted_string (locale.translation ("Are you sure you want to remove (remote) parent $1 ($2)?"), [a_target, a_location])
 		end
 
 	target_remove_group (a_group: READABLE_STRING_GENERAL): STRING_32
@@ -547,6 +547,10 @@ feature -- Condition dialog
 	dial_cond_concurrency: STRING_32 do Result := locale.translation ("Concurrency")	end
 	dial_cond_concurrency_exclude: STRING_32 do Result := locale.translation ("Exclude value(s)")	end
 	dial_cond_concurrency_value (value: READABLE_STRING_GENERAL): STRING_32 do Result := locale.translation (value)	end
+	dial_cond_void_safety: STRING_32 do Result := locale.translation ("Void safety")	end
+	dial_cond_void_safety_exclude: STRING_32 do Result := locale.translation ("Exclude value(s)")	end
+	dial_cond_void_safety_value (value: READABLE_STRING_GENERAL): STRING_32 do Result := locale.translation (value)	end
+
 	dial_cond_dynamic_runtime: STRING_32 do Result := locale.translation ("Dynamic runtime")	end
 	dial_cond_version: STRING_32 do Result := locale.translation ("Version")	end
 	dial_cond_version_compiler: STRING_32 do Result := locale.translation ("<= compiler version <= ")	end
@@ -648,14 +652,12 @@ feature -- Create library dialog
 				Result := locale.formatted_string (locale.translation ("[
 Search paths for libraries are specified in the configuration file:
    $1
-
-and could be overwridden by user configuration file:
+and could be overridden by user configuration file:
    $2
 
 Search paths for precompiled libraries are specified in the configuration file:
    $3
-
-and could be overwridden by user configuration file:
+and could be overridden by user configuration file:
    $4
 						]"),
 						[a_lib_cfg, a_user_lib_cfg, a_pre_cfg, a_user_pre_cfg]
@@ -1109,6 +1111,10 @@ feature -- Parse errors
 		do
 			Result := locale.formatted_string (locale.translation ("Invalid concurrency condition $1."), [a_concurrency])
 		end
+	e_parse_incorrect_void_safety (a_void_safety: READABLE_STRING_GENERAL): STRING_32
+		do
+			Result := locale.formatted_string (locale.translation ("Invalid void_safety condition $1."), [a_void_safety])
+		end
 	e_parse_incorrect_dotnet: STRING_32 do Result := locale.translation ("No valid value specified in .NET condition.") end
 	e_parse_incorrect_dynamic_runtime: STRING_32 do Result := locale.translation ("No valid value specified in dynamic runtime condition.") end
 
@@ -1279,7 +1285,7 @@ feature -- Capability errors
 		do
 			Result := locale.formatted_string (locale.translation_in_context
 				("[
-					Capability "$1" of supplier target has value "$2" insuffient for client value "$6".
+					Capability "$1" of supplier target has value "$2" insufficient for client value "$6".
 					Client/child target
 						Name: $7
 						System: $8
@@ -1357,7 +1363,7 @@ feature -- Boolean values
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

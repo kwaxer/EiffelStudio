@@ -5,7 +5,7 @@ note
 		"Eiffel AST comment finders"
 
 	library: "Gobo Eiffel Tools Library"
-	copyright: "Copyright (c) 2007-2017, Eric Bezault and others"
+	copyright: "Copyright (c) 2007-2019, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -36,10 +36,11 @@ inherit
 			process_assigner_instruction,
 			process_assignment,
 			process_assignment_attempt,
-			process_attachment_separate_keywords,
-			process_attachment_symbol_separate_keyword,
+			process_attachment_mark_separate_keyword,
 			process_attribute,
 			process_bang_instruction,
+			process_base_type_constraint_list,
+			process_base_type_rename_constraint,
 			process_binary_integer_constant,
 			process_braced_class_name,
 			process_braced_type,
@@ -55,6 +56,7 @@ inherit
 			process_choice_list,
 			process_choice_range,
 			process_class,
+			process_class_assertion,
 			process_class_type,
 			process_client,
 			process_client_comma,
@@ -64,6 +66,7 @@ inherit
 			process_constant_attribute,
 			process_constrained_formal_parameter,
 			process_constraint_creator,
+			process_constraint_rename_list,
 			process_convert_builtin_expression,
 			process_convert_feature_comma,
 			process_convert_feature_list,
@@ -73,6 +76,7 @@ inherit
 			process_convert_to_expression,
 			process_create_expression,
 			process_create_instruction,
+			process_creation_region,
 			process_creator,
 			process_creator_list,
 			process_current_address,
@@ -87,6 +91,8 @@ inherit
 			process_dot_feature_name,
 			process_dotnet_function,
 			process_dotnet_procedure,
+			process_elseif_expression,
+			process_elseif_expression_list,
 			process_elseif_part,
 			process_elseif_part_list,
 			process_equality_expression,
@@ -116,6 +122,7 @@ inherit
 			process_hexadecimal_integer_constant,
 			process_identifier_colon,
 			process_identifier_comma,
+			process_if_expression,
 			process_if_instruction,
 			process_indexing,
 			process_indexing_semicolon,
@@ -194,6 +201,9 @@ inherit
 			process_token,
 			process_tuple_type,
 			process_type_comma,
+			process_type_constraint_comma,
+			process_type_constraint_list,
+			process_type_rename_constraint,
 			process_underscored_integer_constant,
 			process_underscored_real_constant,
 			process_unfolded_empty_tuple_actual_parameters,
@@ -437,15 +447,7 @@ feature {ET_AST_NODE} -- Processing
 			end
 		end
 
-	process_attachment_separate_keywords (a_keywords: ET_ATTACHMENT_SEPARATE_KEYWORDS)
-			-- Process `a_keywords'.
-		do
-			if not excluded_nodes.has (a_keywords) then
-				precursor (a_keywords)
-			end
-		end
-
-	process_attachment_symbol_separate_keyword (a_keywords: ET_ATTACHMENT_SYMBOL_SEPARATE_KEYWORD)
+	process_attachment_mark_separate_keyword (a_keywords: ET_ATTACHMENT_MARK_SEPARATE_KEYWORD)
 			-- Process `a_keywords'.
 		do
 			if not excluded_nodes.has (a_keywords) then
@@ -466,6 +468,22 @@ feature {ET_AST_NODE} -- Processing
 		do
 			if not excluded_nodes.has (an_instruction) then
 				precursor (an_instruction)
+			end
+		end
+
+	process_base_type_constraint_list (a_list: ET_BASE_TYPE_CONSTRAINT_LIST)
+			-- Process `a_list'.
+		do
+			if not excluded_nodes.has (a_list) then
+				precursor (a_list)
+			end
+		end
+
+	process_base_type_rename_constraint (a_type_rename_constraint: ET_BASE_TYPE_RENAME_CONSTRAINT)
+			-- Process `a_type_rename_constraint'.
+		do
+			if not excluded_nodes.has (a_type_rename_constraint) then
+				precursor (a_type_rename_constraint)
 			end
 		end
 
@@ -593,6 +611,14 @@ feature {ET_AST_NODE} -- Processing
 			end
 		end
 
+	process_class_assertion (a_assertion: ET_CLASS_ASSERTION)
+			-- Process `a_assertion'.
+		do
+			if not excluded_nodes.has (a_assertion) then
+				precursor (a_assertion)
+			end
+		end
+
 	process_class_type (a_type: ET_CLASS_TYPE)
 			-- Process `a_type'.
 		do
@@ -658,6 +684,14 @@ feature {ET_AST_NODE} -- Processing
 		end
 
 	process_constraint_creator (a_list: ET_CONSTRAINT_CREATOR)
+			-- Process `a_list'.
+		do
+			if not excluded_nodes.has (a_list) then
+				precursor (a_list)
+			end
+		end
+
+	process_constraint_rename_list (a_list: ET_CONSTRAINT_RENAME_LIST)
 			-- Process `a_list'.
 		do
 			if not excluded_nodes.has (a_list) then
@@ -734,6 +768,14 @@ feature {ET_AST_NODE} -- Processing
 		do
 			if not excluded_nodes.has (an_instruction) then
 				precursor (an_instruction)
+			end
+		end
+
+	process_creation_region (a_region: ET_CREATION_REGION)
+			-- Process `a_region'.
+		do
+			if not excluded_nodes.has (a_region) then
+				precursor (a_region)
 			end
 		end
 
@@ -846,6 +888,22 @@ feature {ET_AST_NODE} -- Processing
 		do
 			if not excluded_nodes.has (a_feature) then
 				precursor (a_feature)
+			end
+		end
+
+	process_elseif_expression (an_elseif_part: ET_ELSEIF_EXPRESSION)
+			-- Process `an_elseif_part'.
+		do
+			if not excluded_nodes.has (an_elseif_part) then
+				precursor (an_elseif_part)
+			end
+		end
+
+	process_elseif_expression_list (a_list: ET_ELSEIF_EXPRESSION_LIST)
+			-- Process `a_list'.
+		do
+			if not excluded_nodes.has (a_list) then
+				precursor (a_list)
 			end
 		end
 
@@ -1081,6 +1139,14 @@ feature {ET_AST_NODE} -- Processing
 		do
 			if not excluded_nodes.has (an_identifier) then
 				precursor (an_identifier)
+			end
+		end
+
+	process_if_expression (a_expression: ET_IF_EXPRESSION)
+			-- Process `a_expression'.
+		do
+			if not excluded_nodes.has (a_expression) then
+				precursor (a_expression)
 			end
 		end
 
@@ -1716,6 +1782,30 @@ feature {ET_AST_NODE} -- Processing
 		do
 			if not excluded_nodes.has (a_type) then
 				precursor (a_type)
+			end
+		end
+
+	process_type_constraint_comma (a_type_constraint_comma: ET_TYPE_CONSTRAINT_COMMA)
+			-- Process `a_type_constraint_comma'.
+		do
+			if not excluded_nodes.has (a_type_constraint_comma) then
+				precursor (a_type_constraint_comma)
+			end
+		end
+
+	process_type_constraint_list (a_list: ET_TYPE_CONSTRAINT_LIST)
+			-- Process `a_list'.
+		do
+			if not excluded_nodes.has (a_list) then
+				precursor (a_list)
+			end
+		end
+
+	process_type_rename_constraint (a_type_rename_constraint: ET_TYPE_RENAME_CONSTRAINT)
+			-- Process `a_type_rename_constraint'.
+		do
+			if not excluded_nodes.has (a_type_rename_constraint) then
+				precursor (a_type_rename_constraint)
 			end
 		end
 

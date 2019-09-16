@@ -290,7 +290,7 @@ feature {NONE} -- Pick and Drop implementation
 
 				internal_items_stone_data.put (t, col_value_index)
 				internal_items_stone_data.put (t, col_type_index)
-			elseif attached {CLASS_C} object_dynamic_class as ocl then
+			elseif attached object_dynamic_class as ocl then
 				st := create {CLASSC_STONE}.make (ocl)
 				create t
 				t.pebble := st
@@ -580,11 +580,8 @@ feature -- Graphical computation
 		require
 			is_attached_to_row: is_attached_to_row
 			row.count > 0
-		local
-			gi: EV_GRID_ITEM
 		do
-			gi := row.item (Col_pixmap_index)
-			grid_cell_set_pixmap (gi, v)
+			grid_cell_set_pixmap (row.item (Col_pixmap_index), v)
 		end
 
 feature -- Column index
@@ -667,7 +664,7 @@ feature -- Updating
 
 	last_dump_value: DUMP_VALUE
 
-feature {NONE} -- Implementation
+feature {NONE} -- Icons
 
 	icons: ARRAY [EV_PIXMAP]
 			-- List of available icons for objects.
@@ -751,14 +748,12 @@ feature {NONE} -- Filling
 
 	on_slice_double_click (a_x, a_y, a_button: INTEGER; a_x_tilt, a_y_tilt, a_pressure: DOUBLE; a_screen_x, a_screen_y: INTEGER)
 			-- Action triggered by double clicking on the slice limit row
-		local
-			cmd: ES_OBJECTS_GRID_SLICES_CMD
 		do
-			cmd := parent_grid.slices_cmd
-			if cmd /= Void then
-				if attached {OBJECT_STONE} item_stone (col_value_index) as os then
-					cmd.drop_object_stone (os)
-				end
+			if
+				attached parent_grid.slices_cmd as cmd and then
+				attached {OBJECT_STONE} item_stone (col_value_index) as os
+			then
+				cmd.drop_object_stone (os)
 			end
 		end
 
@@ -814,16 +809,15 @@ feature {NONE} -- Filling
 			if a_row.is_expandable and then not a_row.is_expanded then
 				a_row.expand
 			end
-			if a_row.is_expanded then
-				if
-					display_onces
-					and onces_row /= Void
-					and then onces_row.parent /= Void
-					and then onces_row.is_expandable
-					and then not onces_row.is_expanded
-				then
-					onces_row.expand
-				end
+			if
+				a_row.is_expanded and then
+				display_onces
+				and onces_row /= Void
+				and then onces_row.parent /= Void
+				and then onces_row.is_expandable
+				and then not onces_row.is_expanded
+			then
+				onces_row.expand
 			end
 		end
 
@@ -840,7 +834,6 @@ feature {NONE} -- Filling
 			es_glab: EV_GRID_LABEL_ITEM
 
 			vlist: DEBUG_VALUE_LIST
-			list_cursor: like {DEBUG_VALUE_LIST}.new_cursor
 
 			l_row_index: INTEGER
 			dcl: like object_dynamic_class
@@ -874,10 +867,10 @@ feature {NONE} -- Filling
 						l_is_tuple := dcl.conform_to (debugger_manager.compiler_data.tuple_class_c)
 					end
 					grid := a_row.parent
+					l_row_index := a_row.index
+					across
+						vlist as c
 					from
-						l_row_index := a_row.index
-						list_cursor := vlist.new_cursor
-						list_cursor.start
 						if l_is_tuple then
 								-- We do not display the first elements at position `0' in the TUPLE because
 								-- it corresponds to `object_comparison' encoded as the value at position 0. This
@@ -886,17 +879,13 @@ feature {NONE} -- Filling
 									-- Only insert more rows if TUPLE has some actual generics.
 								a_row.insert_subrows (vlist.count - 1, 1)
 							end
-							list_cursor.forth
+							c.forth
 						else
 							a_row.insert_subrows (vlist.count, 1)
 						end
-					until
-						list_cursor.after
 					loop
-						val := list_cursor.item
 						l_row_index := l_row_index + 1
-						attach_debug_value_from_line_to_grid_row (grid.row (l_row_index), val, Current, Void)
-						list_cursor.forth
+						attach_debug_value_from_line_to_grid_row (grid.row (l_row_index), c.item, Current, Void)
 					end
 					if object_is_special_value then
 						if object_spec_lower > 0 then
@@ -914,7 +903,7 @@ feature {NONE} -- Filling
 							object_spec_upper < object_spec_count_and_capacity.spec_capacity - 1
 						then
 							es_glab := slice_label_item (Interface_names.l_More_items)
-							es_glab.pointer_double_press_actions.force_extend (agent on_slice_double_click)
+							es_glab.pointer_double_press_actions.extend (agent on_slice_double_click)
 							if onces_row /= Void then
 								i := onces_row.index
 							else
@@ -931,14 +920,14 @@ feature {NONE} -- Filling
 							debugger_manager.is_classic_project and then
 							dcl.conform_to (debugger_manager.compiler_data.special_class_c)
 						then
-							fill_extra_attributes_for_special (a_row, list_cursor)
+							fill_extra_attributes_for_special (a_row, vlist)
 						elseif l_is_tuple then
-							fill_extra_attributes_for_tuple (a_row, list_cursor)
+							fill_extra_attributes_for_tuple (a_row, vlist)
 						elseif
 							Eb_debugger_manager.display_agent_details
 							and then dcl.conform_to (debugger_manager.compiler_data.routine_class_c)
 						then
-							fill_extra_attributes_for_agent (a_row, list_cursor)
+							fill_extra_attributes_for_agent (a_row, vlist)
 						end
 					end
 				end
@@ -1014,7 +1003,6 @@ feature {NONE} -- Filling
 			flist: LIST [E_CONSTANT]
 			c: E_CONSTANT
 			csts: ARRAYED_LIST [ABSTRACT_DEBUG_VALUE]
-			cdv: ABSTRACT_DEBUG_VALUE
 			r: INTEGER
 			grid: EV_GRID
 			deval: DBG_EVALUATOR
@@ -1031,21 +1019,18 @@ feature {NONE} -- Filling
 
 			if not flist.is_empty then
 				create csts.make (flist.count)
-				from
-					flist.start
-				until
-					flist.after
+				across
+					flist as f
 				loop
-					c := flist.item
-					if attached {CONSTANT_I} c.associated_feature_i as ci then
-						cdv := deval.value_from_constant_i (ci)
-						if cdv /= Void then
-								-- |FIXME: Handle Unicode
-							cdv.set_name (flist.item.name_32.as_string_8)
-							csts.extend (cdv)
-						end
+					c := f.item
+					if
+						attached {CONSTANT_I} c.associated_feature_i as ci and then
+						attached deval.value_from_constant_i (ci) as cdv
+					then
+							-- TODO: Handle Unicode
+						cdv.set_name (f.item.name_32.as_string_8)
+						csts.extend (cdv)
 					end
-					flist.forth
 				end
 				if not csts.is_empty then
 					from
@@ -1102,17 +1087,16 @@ feature {NONE} -- Agent filling
 			result_attached: Result /= Void
 		end
 
-	fill_extra_attributes_for_special (a_row: EV_GRID_ROW; list_cursor: like {DEBUG_VALUE_LIST}.new_cursor)
+	fill_extra_attributes_for_special (a_row: EV_GRID_ROW; lst: ITERABLE [ABSTRACT_DEBUG_VALUE])
 		require
 			a_row /= Void
-			list_cursor /= Void
+			lst /= Void
 		local
 			lrow: EV_GRID_ROW
-			grid: EV_GRID
 			glab: EV_GRID_LABEL_ITEM
+			list_cursor: ITERATION_CURSOR [ABSTRACT_DEBUG_VALUE]
 		do
-			grid := a_row.parent
-			list_cursor.start
+			list_cursor := lst.new_cursor
 
 			a_row.insert_subrow (1)
 			lrow := a_row.subrow (1)
@@ -1135,80 +1119,75 @@ feature {NONE} -- Agent filling
 			lrow.set_item (Col_value_index, glab)
 		end
 
-	fill_extra_attributes_for_tuple (a_row: EV_GRID_ROW; list_cursor: like {DEBUG_VALUE_LIST}.new_cursor)
+	fill_extra_attributes_for_tuple (a_row: EV_GRID_ROW; lst: ITERABLE [ABSTRACT_DEBUG_VALUE])
 		require
 			a_row /= Void
-			list_cursor /= Void
+			lst /= Void
 		local
 			lrow: EV_GRID_ROW
-			grid: EV_GRID
 			r: INTEGER
 			glab: EV_GRID_LABEL_ITEM
 			gf: EB_GRID_EDITOR_TOKEN_ITEM
 			f: E_FEATURE
+			list_cursor: ITERATION_CURSOR [ABSTRACT_DEBUG_VALUE]
 		do
-			grid := a_row.parent
-			list_cursor.start
-			if not list_cursor.after then
-				if attached {DEBUG_BASIC_VALUE [BOOLEAN]} list_cursor.item as vitem then
-					r := 1
-					a_row.insert_subrow (r)
-					lrow := a_row.subrow (r)
+			list_cursor := lst.new_cursor
+			if
+				not list_cursor.after and then
+				attached {DEBUG_BASIC_VALUE [BOOLEAN]} list_cursor.item as vitem
+			then
+				r := 1
+				a_row.insert_subrow (r)
+				lrow := a_row.subrow (r)
 
-					f := debugger_manager.compiler_data.tuple_class_c.feature_with_name_32 ("object_comparison")
-					create gf
-					if f /= Void then
-						gf.set_pixmap (pixmap_from_e_feature (f))
-						Grid_feature_style.set_e_feature (f)
-						gf.set_text_with_tokens (Grid_feature_style.text)
-					else
-						gf.set_pixmap (pixmaps.icon_pixmaps.feature_routine_icon)
-						gf.set_text ("object_comparison")
-					end
-					gf.set_overriden_fonts (label_font_table, label_font_height)
-					lrow.set_item (Col_name_index, gf)
-
-					create glab.make_with_text (vitem.output_value)
-					glab.set_pixmap (pixmaps.mini_pixmaps.general_search_icon)
-					lrow.set_item (Col_value_index, glab)
+				f := debugger_manager.compiler_data.tuple_class_c.feature_with_name_32 ("object_comparison")
+				create gf
+				if f /= Void then
+					gf.set_pixmap (pixmap_from_e_feature (f))
+					Grid_feature_style.set_e_feature (f)
+					gf.set_text_with_tokens (Grid_feature_style.text)
+				else
+					gf.set_pixmap (pixmaps.icon_pixmaps.feature_routine_icon)
+					gf.set_text ("object_comparison")
 				end
+				gf.set_overriden_fonts (label_font_table, label_font_height)
+				lrow.set_item (Col_name_index, gf)
+
+				create glab.make_with_text (vitem.output_value)
+				glab.set_pixmap (pixmaps.mini_pixmaps.general_search_icon)
+				lrow.set_item (Col_value_index, glab)
 			end
 		end
 
-	fill_extra_attributes_for_agent (a_row: EV_GRID_ROW; list_cursor: like {DEBUG_VALUE_LIST}.new_cursor)
+	fill_extra_attributes_for_agent (a_row: EV_GRID_ROW; lst: ITERABLE [ABSTRACT_DEBUG_VALUE])
 		require
 			a_row /= Void
-			list_cursor /= Void
+			lst /= Void
 		local
 			lrow: EV_GRID_ROW
-			n: STRING
-			v_item: ABSTRACT_DEBUG_VALUE
 			v_routine_id: detachable DEBUG_BASIC_VALUE [INTEGER]
 			rid: INTEGER
-			grid: EV_GRID
 			ag_fe: E_FEATURE
 			r: INTEGER
 			glab: EV_GRID_LABEL_ITEM
 			gf: EB_GRID_EDITOR_TOKEN_ITEM
 		do
-			grid := a_row.parent
-			from
-				list_cursor.start
+			across
+				lst as ic
 			until
-				list_cursor.after or v_routine_id /= Void
+				v_routine_id /= Void
 			loop
-				v_item := list_cursor.item
-				if v_item /= Void then
-					n := v_item.name
-					if n /= Void and then n.count > 3 then
-						if attached {DEBUG_BASIC_VALUE [INTEGER]} v_item as vi then
-							if vi.name /= Void and then v_routine_id = Void and n.item (1) = 'r' and then n.same_string ("routine_id") then
-								v_routine_id := vi
-							end
-						end
-					end
+				if attached ic.item as v_item and then
+					attached v_item.name as n and then
+					n.count > 3 and then
+					attached {DEBUG_BASIC_VALUE [INTEGER]} v_item as vi and then
+					vi.name /= Void and then
+					v_routine_id = Void and then
+					n.item (1) = 'r' and then
+					n.same_string ("routine_id")
+				then
+					v_routine_id := vi
 				end
-				list_cursor.forth
 			end
 			if v_routine_id /= Void then
 				rid := v_routine_id.value

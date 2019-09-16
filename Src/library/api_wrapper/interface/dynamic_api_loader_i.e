@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "[
 		An interface of the dynamic API loader for accessing libraries and loaded library API functions and variables.
 		
@@ -6,8 +6,8 @@ note
 		      to loading or querying for an API feature may be necessary, hence the interface is available.
 	]"
 	legal: "See notice at end of class."
-	status: "See notice at end of class.";
-	date: "$Date$";
+	status: "See notice at end of class."
+	date: "$Date$"
 	revision: "$Revision$"
 
 deferred class
@@ -49,13 +49,10 @@ feature -- Query
 			not_a_hnd_is_null: a_hnd /= default_pointer
 			a_api_name_attached: attached a_api_name
 			not_a_api_name_is_empty: not a_api_name.is_empty
-		local
-			l_exception: DYNAMIC_API_UNAVAILABLE_EXCEPTION
 		do
 			Result := api_pointer (a_hnd, a_api_name)
 			if Result = default_pointer then
-				create l_exception.make (a_api_name.as_string_8)
-				l_exception.raise
+				;(create {DYNAMIC_API_UNAVAILABLE_EXCEPTION}.make (a_api_name)).raise
 			end
 		ensure
 			not_result_is_null: Result /= default_pointer
@@ -63,7 +60,7 @@ feature -- Query
 
 feature -- Basic operations
 
-	load_library (a_name: READABLE_STRING_8; a_version: detachable READABLE_STRING_8): POINTER
+	load_library (a_name: READABLE_STRING_GENERAL; a_version: detachable READABLE_STRING_GENERAL): POINTER
 			-- Attempts to loads a dynamic library using a library name.
 			--
 			-- `a_name': The name of a dynamic library, without an extension.
@@ -77,7 +74,7 @@ feature -- Basic operations
 		deferred
 		end
 
-	load_library_from_path (a_path: READABLE_STRING_8): POINTER
+	load_library_from_path (a_path: READABLE_STRING_GENERAL): POINTER
 			-- Attempts to loads a dynamic library from a path on disk.
 			--
 			-- `a_path': The path to a dynamic library.
@@ -100,8 +97,8 @@ feature -- Basic operations
 		end
 
 ;note
-	copyright:	"Copyright (c) 1984-2009, Eiffel Software"
-	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software and others"
+	license:	"Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[
 			This file is part of Eiffel Software's Eiffel Development Environment.

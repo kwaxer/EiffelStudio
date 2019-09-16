@@ -52,6 +52,13 @@ feature -- Access: auth strategy
 			Result implies a_response.is_authenticated
 		end
 
+	has_permission_to_use_authentication (api: CMS_API): BOOLEAN
+			-- Is current user (or anonymous) has permssion to use Current authentication?
+		do
+				-- By default, authorize
+			Result := True
+		end
+
 feature -- Hooks configuration
 
 	setup_hooks (a_hooks: CMS_HOOK_CORE_MANAGER)
@@ -74,10 +81,14 @@ feature -- Hooks
 			else
 				l_destination := a_response.location
 			end
+			l_destination := secured_url_content (l_destination)
 			if is_authenticating (a_response) then
 
 			else
-				if a_response.location.starts_with ("account/auth/") then
+				if
+					a_response.location.starts_with ("account/auth/") and then
+					has_permission_to_use_authentication (a_response.api)
+				then
 					create lnk.make (login_title, login_location)
 					if not l_destination.starts_with ("account/auth/") then
 						lnk.add_query_parameter ("destination", l_destination)
@@ -92,7 +103,7 @@ feature {NONE} -- Template
 
 	smarty_template_login_block (a_request: WSF_REQUEST; a_module: CMS_MODULE; a_block_id: READABLE_STRING_8; a_cms_api: CMS_API): like smarty_template_block
 		local
-			l_destination: detachable READABLE_STRING_32
+			l_destination: detachable READABLE_STRING_GENERAL
 		do
 			Result := smarty_template_block (a_module, a_block_id, a_cms_api)
 			if Result /= Void then
@@ -101,8 +112,12 @@ feature {NONE} -- Template
 				elseif attached {WSF_STRING} a_request.form_parameter ("destination") as p_destination then
 					l_destination := p_destination.value
 				end
-				if l_destination /= Void then
-					Result.set_value (l_destination, "site_destination")
+				if
+					l_destination /= Void and then
+					not l_destination.is_whitespace and then
+					l_destination.is_valid_as_string_8
+				then
+					Result.set_value (secured_url_content (l_destination.to_string_8), "site_destination")
 				end
 			end
 		end

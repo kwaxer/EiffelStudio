@@ -27,6 +27,12 @@ inherit
 			default_create
 		end
 
+	CONF_FILE_CONSTANTS
+		undefine
+			copy,
+			default_create
+		end
+
 	CONF_VALIDITY
 		undefine
 			copy,
@@ -104,6 +110,12 @@ feature {NONE} -- Initialization
 				do
 					a_split.set_proportion (0.9)
 				end (?, ?, ?, ?, hsp))
+
+			dpi_changed_actions.extend (agent (a_dpi, ia_x, ia_y, ia_width, ia_height: INTEGER; a_split: EV_VERTICAL_SPLIT_AREA)
+				do
+					a_split.set_proportion (0.9)
+				end (?, ?, ?, ?, ?, hsp))
+
 
 			l_service.set_associated_widget (Current)
 		end
@@ -726,7 +738,7 @@ feature {NONE} -- Action handlers
 						last_group := g
 							-- add an empty classes list that it get's displayed in the classes tree
 						g.set_classes (create {STRING_TABLE [CONF_CLASS]}.make (0))
-						l_sys := factory.new_system_generate_uuid_with_file_name ("dummy_location", "dummy")
+						l_sys := factory.new_system_generate_uuid_with_file_name ("dummy_location", "dummy", latest_namespace)
 						l_sys.set_application_target (target)
 						g.set_library_target (factory.new_target ("dummy", l_sys))
 						target.add_library (g)
@@ -851,7 +863,7 @@ invariant
 	target_set_in_boxes: search_results_box.target = target
 
 ;note
-	copyright: "Copyright (c) 1984-2018, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

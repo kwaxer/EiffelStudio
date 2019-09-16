@@ -50,7 +50,7 @@ feature -- Status report
 
 feature -- Properties
 
-	target_name: STRING_32
+	target_name: READABLE_STRING_32
 			-- Name of the universe target.
 		require
 			target_not_void: target /= Void
@@ -98,30 +98,34 @@ feature -- Properties
 				end
 				l_version.force (l_clr_version, v_msil_clr)
 			end
-			create Result.make (platform, build, concurrency, system.il_generation, system.has_dynamic_runtime, a_target.variables, l_version)
+			create Result.make (platform, build, concurrency, void_safety, system.il_generation, system.has_dynamic_runtime, a_target.variables, l_version)
 		end
 
 	concurrency: INTEGER
-			-- Type of Concurrency (none, thread, scoop)
+			-- Type of Concurrency (none, thread, scoop).
 		do
-			if workbench.system_defined then
-				inspect
-					system.concurrency_index
-				when {CONF_TARGET_OPTION}.concurrency_index_thread then
-					Result := concurrency_multithreaded
-				when {CONF_TARGET_OPTION}.concurrency_index_scoop then
-					Result := concurrency_scoop
-				else
-						-- Default to no concurrency if none is specified.
-					if system.has_multithreaded then
-						Result := concurrency_multithreaded
-					else
-						Result := concurrency_none
-					end
-				end
+			if
+				workbench.system_defined and then
+				{CONF_TARGET_OPTION}.is_concurrency_index (system.concurrency_index)
+			then
+				Result := {CONF_TARGET_OPTION}.concurrency_mode_from_index (system.concurrency_index)
 			else
-					-- System is not defined!
+					-- Default if none is specified or system is not defined.
 				Result := concurrency_none
+			end
+		end
+
+	void_safety: INTEGER
+			-- Type of void_safety (none, conformance, initialization, transitional, all).
+		do
+			if
+				workbench.system_defined and then
+				{CONF_TARGET_OPTION}.is_void_safety_index (system.void_safety_index)
+			then
+				Result := {CONF_TARGET_OPTION}.void_safety_mode_from_index (system.void_safety_index)
+			else
+					-- Default if none is specified or system is not defined.
+				Result := void_safety_all
 			end
 		end
 
@@ -214,7 +218,6 @@ feature -- Properties
 			l_libraries: ARRAYED_LIST [CONF_LIBRARY]
 			l_sub_libraries: ARRAYED_LIST [CONF_LIBRARY]
 			l_apt_library_targets: HASH_TABLE [detachable CONF_TARGET, UUID]
-			l_library: CONF_LIBRARY
 			l_uuid: UUID
 			l_cursor: CURSOR
 		do
@@ -254,9 +257,6 @@ feature -- Properties
 					l_targets.forth
 				end
 			end
-				-- Done with target list
-			l_targets := Void
-			l_target := Void
 
 				-- Step #2
 				-- Retrieve the applicable targets for a class within a library. Applicable targets are direct
@@ -268,8 +268,7 @@ feature -- Properties
 					-- The class is from a library, we need to navigate down to find first level libraries.
 				l_libraries := target.libraries.linear_representation
 				from l_libraries.start until l_libraries.after loop
-					l_library := l_libraries.item
-					l_target := l_library.library_target
+					l_target := l_libraries.item.library_target
 					l_uuid := l_target.system.uuid
 					if not l_apt_library_targets.has (l_uuid) then
 						if l_target = l_class_target then
@@ -300,10 +299,6 @@ feature -- Properties
 					end
 					l_libraries.forth
 				end
-				l_libraries := Void
-				l_sub_libraries := Void
-				l_library := Void
-				l_target := Void
 
 				from l_apt_library_targets.start until l_apt_library_targets.after loop
 					l_target := l_apt_library_targets.item_for_iteration
@@ -329,10 +324,12 @@ feature -- Properties
 					if attached l_clusters.item.classes as l_classes then
 						l_cluster_classes := l_classes.linear_representation
 						from l_cluster_classes.start until l_cluster_classes.after loop
-							if attached {CLASS_I} l_cluster_classes.item_for_iteration as l_class_i and then l_class_i.target = l_target then
-								if not Result.has (l_class_i) then
-									Result.force (l_class_i)
-								end
+							if
+								attached {CLASS_I} l_cluster_classes.item_for_iteration as l_class_i and then
+								l_class_i.target = l_target and then
+								not Result.has (l_class_i)
+							then
+								Result.force (l_class_i)
 							end
 							l_cluster_classes.forth
 						end
@@ -429,12 +426,13 @@ feature -- Access
 			good_argument: a_class_name /= Void
 			good_group: a_group /= Void
 		do
-			if attached a_group.class_by_name (a_class_name, True) as l_cl then
-				if l_cl.count = 1 then
-					Result := {CLASS_I} / l_cl.first
-					check
-						Result_not_void: Result /= Void
-					end
+			if
+				attached a_group.class_by_name (a_class_name, True) as l_cl and then
+				l_cl.count = 1
+			then
+				Result := {CLASS_I} / l_cl.first
+				check
+					Result_not_void: Result /= Void
 				end
 			end
 		end
@@ -665,7 +663,7 @@ feature {COMPILER_EXPORTER} -- Implementation
 			l_exceptions: SEARCH_TABLE [STRING]
 			l_system: like system
 		do
-			create l_actions.make (50)
+			create l_actions.make (52)
 			create l_exceptions.make (1)
 
 			l_system := system
@@ -694,6 +692,8 @@ feature {COMPILER_EXPORTER} -- Implementation
 			l_actions.put (agent l_system.set_typed_pointer_class, "TYPED_POINTER")
 			l_actions.put (agent l_system.set_string_class (?, 8), "STRING_8")
 			l_actions.put (agent l_system.set_string_class (?, 32), "STRING_32")
+			l_actions.put (agent l_system.set_immutable_string_class (?, 8), "IMMUTABLE_STRING_8")
+			l_actions.put (agent l_system.set_immutable_string_class (?, 32), "IMMUTABLE_STRING_32")
 			l_actions.put (agent l_system.set_array_class, "ARRAY")
 			l_actions.put (agent l_system.set_special_class, "SPECIAL")
 			l_actions.put (agent l_system.set_tuple_class, "TUPLE")
@@ -723,26 +723,27 @@ feature {COMPILER_EXPORTER} -- Implementation
 
 			check_class_unicity (l_actions, l_exceptions)
 
-			if l_system.il_generation then
+				-- TODO: Finish the tests below.
+			-- if l_system.il_generation then
 					-- One more check, let's find out that `system_object' and `system_string'
 					-- are set with EXTERNAL_CLASS_I instances
 
 					-- We test against Void as `system_object_class' is declared as
 					-- EXTERNAL_CLASS_I.
-				if l_system.system_object_class = Void then
-						-- Report error here
-						-- FIXME: Manu: 06/03/2003
-				end
+				-- if l_system.system_object_class = Void then
+				-- 		-- Report error here
+				--		-- FIXME: Manu: 06/03/2003
+				-- end
 
 					-- Check it is an EXTERNAL_CLASS_I instance.
-				if
-					l_system.system_string_class = Void or else
-					not l_system.system_string_class.is_external_class
-				then
-						-- Report error here
-						-- FIXME: Manu: 06/03/2003
-				end
-			end
+				-- if
+				--	 l_system.system_string_class = Void or else
+				--	 not l_system.system_string_class.is_external_class
+				-- then
+				-- 		-- Report error here
+				-- 		-- FIXME: Manu: 06/03/2003
+				-- end
+			-- end
 
 				-- Check sum error
 			Error_handler.checksum
@@ -798,27 +799,28 @@ feature {COMPILER_EXPORTER} -- Implementation
 					l_class_name := a_set.key_for_iteration
 					l_classes := classes_with_name (l_class_name)
 					l_count := l_classes.count
-					if l_count > 1 then
+					if
+						l_count > 1 and then
 							-- Small workaround when a requested basic class also exists in the Universe
 							-- in a .NET assembly. In that case we decide to ignore the .NET classes if
 							-- there is at least one Eiffel class.
-							-- FIXME: we should use the UUID for EiffelBase and only look there for those
+							-- TODO: we should use the UUID for EiffelBase and only look there for those
 							-- classes. This would speed up the lookup dramatically.
-						if not l_classes.for_all (agent {CLASS_I}.is_external_class) then
-							from
-								l_classes.start
-							until
-								l_classes.after
-							loop
-								if l_classes.item.is_external_class then
-									l_classes.remove
-								else
-									l_classes.forth
-								end
+						not l_classes.for_all (agent {CLASS_I}.is_external_class)
+					then
+						from
+							l_classes.start
+						until
+							l_classes.after
+						loop
+							if l_classes.item.is_external_class then
+								l_classes.remove
+							else
+								l_classes.forth
 							end
-								-- Reflect possible changes to the number of classes.
-							l_count := l_classes.count
 						end
+							-- Reflect possible changes to the number of classes.
+						l_count := l_classes.count
 					end
 					if l_count = 0 then
 						if not a_except.has (l_class_name) then
@@ -928,7 +930,7 @@ invariant
 	target_in_conf_system: (conf_system /= Void and new_target = Void) implies target.system = conf_system
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

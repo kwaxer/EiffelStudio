@@ -2,7 +2,6 @@ note
 	description: "Object that represents an OR operation on two class criteria"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
-	author: ""
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -25,8 +24,7 @@ inherit
 	QL_OR_CRITERION
 		redefine
 			left,
-			right,
-			intrinsic_domain
+			right
 		end
 
 create
@@ -63,11 +61,11 @@ feature -- Access
 	intrinsic_domain: QL_CLASS_DOMAIN
 			-- Intrinsic_domain which can be inferred from current criterion
 		do
-			Result ?= intrinsic_domain_internal
+			Result := intrinsic_domain_internal
 		end
 
 note
-	copyright: "Copyright (c) 1984-2013, Eiffel Software"
+	copyright: "Copyright (c) 1984-2018, Eiffel Software"
 	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[
@@ -97,7 +95,5 @@ note
 			Website http://www.eiffel.com
 			Customer support http://support.eiffel.com
 		]"
-
-
 
 end

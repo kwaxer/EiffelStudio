@@ -12,7 +12,6 @@ note
 				]"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
-	author: ""
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -26,9 +25,6 @@ inherit
 		end
 
 	QL_OBSERVER
-		redefine
-			update
-		end
 
 feature -- Status report
 
@@ -46,19 +42,16 @@ feature -- Notification
 
 	update (a_observable: QL_DOMAIN_GENERATOR; a_data: like item_type)
 			-- Notification from `a_observable' indicating that `a_data' changed.
-		local
-			a_item: like item_type
 		do
 			wipe_out
-			a_item ?= a_data.nearest_parent_with_scope (scope)
-			if a_item /= Void then
+			if attached {like item_type} a_data.nearest_parent_with_scope (scope) as a_item then
 				check a_item.is_valid_domain_item end
 				content.extend (a_item)
 			end
 		end
 
 note
-	copyright: "Copyright (c) 1984-2013, Eiffel Software"
+	copyright: "Copyright (c) 1984-2018, Eiffel Software"
 	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[
@@ -88,7 +81,5 @@ note
 			Website http://www.eiffel.com
 			Customer support http://support.eiffel.com
 		]"
-
-
 
 end

@@ -5,12 +5,16 @@ note
 		"Lace parser skeletons"
 
 	library: "Gobo Eiffel Tools Library"
-	copyright: "Copyright (c) 1999-2014, Eric Bezault and others"
+	copyright: "Copyright (c) 1999-2019, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
 
 deferred class ET_LACE_PARSER_SKELETON
+
+obsolete
+
+	"Use ET_ECF_* classes instead. [2019-03-17]"
 
 inherit
 
@@ -330,8 +334,6 @@ feature {NONE} -- AST factory
 			a_name_not_empty: not a_name.is_empty
 		do
 			Result := ast_factory.new_system (a_name)
-			Result.set_error_handler (ast_factory.new_error_handler)
-			Result.set_ast_factory (ast_factory.new_ast_factory)
 		ensure
 			system_not_void: Result /= Void
 		end

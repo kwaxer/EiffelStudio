@@ -174,6 +174,18 @@ feature {NONE} -- Initialization
 			create invariant_post_actions
 			create loop_pre_actions
 			create loop_post_actions
+			create loop_iteration_pre_actions
+			create loop_iteration_post_actions
+			create loop_from_pre_actions
+			create loop_from_post_actions
+			create loop_invariant_pre_actions
+			create loop_invariant_post_actions
+			create loop_exit_pre_actions
+			create loop_exit_post_actions
+			create loop_body_pre_actions
+			create loop_body_post_actions
+			create loop_variant_pre_actions
+			create loop_variant_post_actions
 			create nested_pre_actions
 			create nested_post_actions
 			create nested_expr_pre_actions
@@ -582,14 +594,74 @@ feature {CA_STANDARD_RULE} -- Adding agents
 			invariant_post_actions.extend (a)
 		end
 
-	add_loop_pre_action (a_action: attached PROCEDURE [LOOP_AS])
+	add_loop_pre_action (a: PROCEDURE [LOOP_AS])
 		do
-			loop_pre_actions.extend (a_action)
+			loop_pre_actions.extend (a)
 		end
 
-	add_loop_post_action (a_action: attached PROCEDURE [LOOP_AS])
+	add_loop_post_action (a: PROCEDURE [LOOP_AS])
 		do
-			loop_post_actions.extend (a_action)
+			loop_post_actions.extend (a)
+		end
+
+	add_loop_iteration_pre_action (a: PROCEDURE [ITERATION_AS, LOOP_AS])
+		do
+			loop_iteration_pre_actions.extend (a)
+		end
+
+	add_loop_iteration_post_action (a: PROCEDURE [ITERATION_AS, LOOP_AS])
+		do
+			loop_iteration_post_actions.extend (a)
+		end
+
+	add_loop_from_pre_action (a: PROCEDURE [EIFFEL_LIST [INSTRUCTION_AS], LOOP_AS])
+		do
+			loop_from_pre_actions.extend (a)
+		end
+
+	add_loop_from_post_action (a: PROCEDURE [EIFFEL_LIST [INSTRUCTION_AS], LOOP_AS])
+		do
+			loop_from_post_actions.extend (a)
+		end
+
+	add_loop_invariant_pre_action (a: PROCEDURE [EIFFEL_LIST [TAGGED_AS], LOOP_AS])
+		do
+			loop_invariant_pre_actions.extend (a)
+		end
+
+	add_loop_invariant_post_action (a: PROCEDURE [EIFFEL_LIST [TAGGED_AS], LOOP_AS])
+		do
+			loop_invariant_post_actions.extend (a)
+		end
+
+	add_loop_exit_pre_action (a: PROCEDURE [EXPR_AS, LOOP_AS])
+		do
+			loop_exit_pre_actions.extend (a)
+		end
+
+	add_loop_exit_post_action (a: PROCEDURE [EXPR_AS, LOOP_AS])
+		do
+			loop_exit_post_actions.extend (a)
+		end
+
+	add_loop_body_pre_action (a: PROCEDURE [EIFFEL_LIST [INSTRUCTION_AS], LOOP_AS])
+		do
+			loop_body_pre_actions.extend (a)
+		end
+
+	add_loop_body_post_action (a: PROCEDURE [EIFFEL_LIST [INSTRUCTION_AS], LOOP_AS])
+		do
+			loop_body_post_actions.extend (a)
+		end
+
+	add_loop_variant_pre_action (a: PROCEDURE [VARIANT_AS, LOOP_AS])
+		do
+			loop_variant_pre_actions.extend (a)
+		end
+
+	add_loop_variant_post_action (a: PROCEDURE [VARIANT_AS, LOOP_AS])
+		do
+			loop_variant_post_actions.extend (a)
 		end
 
 	add_nested_pre_action (a_action: attached PROCEDURE [NESTED_AS])
@@ -812,6 +884,18 @@ feature {NONE} -- Agent lists
 
 	loop_pre_actions, loop_post_actions: ACTION_SEQUENCE [TUPLE [LOOP_AS]]
 
+	loop_iteration_pre_actions, loop_iteration_post_actions: ACTION_SEQUENCE [TUPLE [ITERATION_AS, LOOP_AS]]
+
+	loop_from_pre_actions, loop_from_post_actions: ACTION_SEQUENCE [TUPLE [EIFFEL_LIST [INSTRUCTION_AS], LOOP_AS]]
+
+	loop_invariant_pre_actions, loop_invariant_post_actions: ACTION_SEQUENCE [TUPLE [EIFFEL_LIST [TAGGED_AS], LOOP_AS]]
+
+	loop_exit_pre_actions, loop_exit_post_actions: ACTION_SEQUENCE [TUPLE [EXPR_AS, LOOP_AS]]
+
+	loop_body_pre_actions, loop_body_post_actions: ACTION_SEQUENCE [TUPLE [EIFFEL_LIST [INSTRUCTION_AS], LOOP_AS]]
+
+	loop_variant_pre_actions, loop_variant_post_actions: ACTION_SEQUENCE [TUPLE [VARIANT_AS, LOOP_AS]]
+
 	nested_pre_actions, nested_post_actions: ACTION_SEQUENCE [TUPLE [NESTED_AS]]
 
 	nested_expr_pre_actions, nested_expr_post_actions: ACTION_SEQUENCE [NESTED_EXPR_AS]
@@ -934,11 +1018,12 @@ feature {NONE} -- Processing
 			binary_post_actions.call ([a])
 		end
 
-	process_bin_eq_as (a_bin_eq: BIN_EQ_AS)
+	process_bin_eq_as (a: BIN_EQ_AS)
 		do
-			bin_eq_pre_actions.call ([a_bin_eq])
-			Precursor (a_bin_eq)
-			bin_eq_post_actions.call ([a_bin_eq])
+			bin_eq_pre_actions.call (a)
+			a.left.process (Current)
+			a.right.process (Current)
+			bin_eq_post_actions.call (a)
 		end
 
 	process_bin_ge_as (a_bin_ge: BIN_GE_AS)
@@ -969,18 +1054,20 @@ feature {NONE} -- Processing
 			bin_lt_post_actions.call ([a_bin_lt])
 		end
 
-	process_bin_ne_as (a_bin_ne: BIN_NE_AS)
+	process_bin_ne_as (a: BIN_NE_AS)
 		do
-			bin_ne_pre_actions.call ([a_bin_ne])
-			Precursor (a_bin_ne)
-			bin_ne_post_actions.call ([a_bin_ne])
+			bin_ne_pre_actions.call (a)
+			a.left.process (Current)
+			a.right.process (Current)
+			bin_ne_post_actions.call (a)
 		end
 
 	process_bin_not_tilde_as (a: BIN_NOT_TILDE_AS)
 			-- <Precursor>
 		do
 			bin_not_tilde_pre_actions.call (a)
-			Precursor (a)
+			a.left.process (Current)
+			a.right.process (Current)
 			bin_not_tilde_post_actions.call (a)
 		end
 
@@ -988,7 +1075,8 @@ feature {NONE} -- Processing
 			-- <Precursor>
 		do
 			bin_tilde_pre_actions.call (a)
-			Precursor (a)
+			a.left.process (Current)
+			a.right.process (Current)
 			bin_tilde_post_actions.call (a)
 		end
 
@@ -1143,11 +1231,41 @@ feature {NONE} -- Processing
 			invariant_post_actions.call (a)
 		end
 
-	process_loop_as (a_loop: LOOP_AS)
+	process_loop_as (a: LOOP_AS)
+			-- <Precursor>
 		do
-			loop_pre_actions.call ([a_loop])
-			Precursor (a_loop)
-			loop_post_actions.call ([a_loop])
+			loop_pre_actions.call (a)
+			if attached a.iteration as p then
+				loop_iteration_pre_actions.call (p, a)
+				p.process (Current)
+				loop_iteration_post_actions.call (p, a)
+			end
+			if attached a.from_part as p then
+				loop_from_pre_actions.call (p, a)
+				p.process (Current)
+				loop_from_post_actions.call (p, a)
+			end
+			if attached a.invariant_part as p then
+				loop_invariant_pre_actions.call (p, a)
+				p.process (Current)
+				loop_invariant_post_actions.call (p, a)
+			end
+			if attached a.stop as p then
+				loop_exit_pre_actions.call (p, a)
+				p.process (Current)
+				loop_exit_post_actions.call (p, a)
+			end
+			if attached a.compound as p then
+				loop_body_pre_actions.call (p, a)
+				p.process (Current)
+				loop_body_post_actions.call (p, a)
+			end
+			if attached a.variant_part as p then
+				loop_variant_pre_actions.call (p, a)
+				p.process (Current)
+				loop_variant_post_actions.call (p, a)
+			end
+			loop_post_actions.call (a)
 		end
 
 	process_nested_as (a: NESTED_AS)
@@ -1259,7 +1377,7 @@ feature {NONE} -- Processing
 		end
 
 note
-	ca_ignore: "CA033", "CA033 — very long class"
+	ca_ignore: "CA033", "CA033: very long class"
 	copyright:	"Copyright (c) 2014-2018, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"

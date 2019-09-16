@@ -3,6 +3,7 @@ note
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
 	author: "Xavier Rousselot"
+	revised_by: "Alexander Kogtenkov"
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -12,7 +13,6 @@ class
 inherit
 	EB_FEATURE_CONTENT_FORMATTER
 		redefine
-			is_dotnet_formatter,
 			format,
 			browser
 		end
@@ -35,9 +35,7 @@ feature -- Properties
 	symbol: ARRAY [EV_PIXMAP]
 			-- Graphical representation of the command.
 		once
-			create Result.make (1, 2)
-			Result.put (pixmaps.icon_pixmaps.feature_homonyms_icon, 1)
-			Result.put (pixmaps.icon_pixmaps.feature_homonyms_icon, 2)
+			create Result.make_filled (pixmaps.icon_pixmaps.feature_homonyms_icon, 1, 2)
 		end
 
 	pixel_buffer: EV_PIXEL_BUFFER
@@ -145,7 +143,7 @@ feature {NONE} -- Implementation
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2010, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[
@@ -176,5 +174,4 @@ note
 			Customer support http://support.eiffel.com
 		]"
 
-end -- class EB_HOMONYMS_FORMATTER
-
+end

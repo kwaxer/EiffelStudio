@@ -20,7 +20,8 @@ create
 	make, make_with_name, make_with_path,
 	make_open_read, make_open_write, make_open_append,
 	make_open_read_write, make_create_read_write,
-	make_open_read_append
+	make_open_read_append,
+	make_open_temporary, make_open_temporary_with_prefix
 
 feature -- Status report
 
@@ -97,13 +98,13 @@ feature -- Output
 			end
 		end
 
-	put_real, putreal (r: REAL)
+	put_real, putreal (r: REAL_32)
 			-- Write ASCII value of `r' at current position.
 		do
 			file_pr (file_pointer, r)
 		end
 
-	put_double, putdouble (d: DOUBLE)
+	put_double, putdouble (d: REAL_64)
 			-- Write ASCII value `d' at current position.
 		do
 			file_pd (file_pointer, d)
@@ -249,7 +250,7 @@ feature {NONE} -- Implementation
 	return_characters
 			-- Return character(s)
 		do
-			if last_character = '%N' and platform_indicator.is_windows then
+			if last_character = '%N' and {PLATFORM}.is_windows then
 				back
 			end
 			back
@@ -263,7 +264,7 @@ feature {NONE} -- Implementation
 			"eif_file_gi"
 		end
 
-	file_gr (file: POINTER): REAL
+	file_gr (file: POINTER): REAL_32
 			-- Read a real from `file'
 		external
 			"C signature (FILE *): EIF_REAL_32 use %"eif_file.h%""
@@ -271,7 +272,7 @@ feature {NONE} -- Implementation
 			"eif_file_gr"
 		end
 
-	file_gd (file: POINTER): DOUBLE
+	file_gd (file: POINTER): REAL_64
 			-- Read a double from `file'
 		external
 			"C signature (FILE *): EIF_REAL_64 use %"eif_file.h%""
@@ -287,7 +288,7 @@ feature {NONE} -- Implementation
 			"eif_file_pi"
 		end
 
-	file_pr (file: POINTER; r: REAL)
+	file_pr (file: POINTER; r: REAL_32)
 			-- Put `r' to end of `file'.
 		external
 			"C signature (FILE *, EIF_REAL_32) use %"eif_file.h%""
@@ -295,7 +296,7 @@ feature {NONE} -- Implementation
 			"eif_file_pr"
 		end
 
-	file_pd (file: POINTER; d: DOUBLE)
+	file_pd (file: POINTER; d: REAL_64)
 			-- Put `d' to end of `file'.
 		external
 			"C signature (FILE *, EIF_REAL_64) use %"eif_file.h%""
@@ -308,7 +309,7 @@ invariant
 	plain_text: is_plain_text
 
 note
-	copyright: "Copyright (c) 1984-2012, Eiffel Software and others"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software and others"
 	license:   "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software

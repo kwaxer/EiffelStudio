@@ -16,7 +16,7 @@ create
 
 feature {NONE} -- Initialization
 
-	make (a_platform: like platform; a_build: like build; a_concurrency: like concurrency; a_dotnet: like is_dotnet; a_dynamic_runtime: like is_dynamic_runtime; a_variables: like custom_variables; a_version: like version)
+	make (a_platform: like platform; a_build: like build; a_concurrency: like concurrency; a_void_safety: like void_safety; a_dotnet: like is_dotnet; a_dynamic_runtime: like is_dynamic_runtime; a_variables: like custom_variables; a_version: like version)
 			-- Create.
 		require
 			valid_platform: valid_platform (a_platform)
@@ -27,6 +27,7 @@ feature {NONE} -- Initialization
 			platform := a_platform
 			build := a_build
 			concurrency := a_concurrency
+			void_safety := a_void_safety
 			is_dotnet := a_dotnet
 			is_dynamic_runtime := a_dynamic_runtime
 			custom_variables := a_variables
@@ -35,6 +36,7 @@ feature {NONE} -- Initialization
 			platform_set: platform = a_platform
 			build_set: build = a_build
 			concurrency_set: concurrency = a_concurrency
+			void_safety_set: void_safety = a_void_safety
 			dotnet_set: is_dotnet = a_dotnet
 			dynamic_runtime_set: is_dynamic_runtime = a_dynamic_runtime
 			variables_set: custom_variables = a_variables
@@ -52,6 +54,11 @@ feature -- Access
 	concurrency: like concurrency_none
 			-- Current concurrency setting.
 			-- (See `concurrency_none', `concurrency_thread', `concurrency_scoop'.)
+
+	void_safety: like void_safety_none
+			-- Current void_safety setting.
+			-- (See `void_safety_all`, `void_safety_transitional', `void_safety_initialization`,
+			--	 `void_safety_conformance`, `void_safety_none`.)
 
 	is_dotnet: BOOLEAN
 			-- Dotnet?
@@ -72,7 +79,7 @@ invariant
 	custom_variables_not_void: custom_variables /= Void
 
 note
-	copyright:	"Copyright (c) 1984-2012, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

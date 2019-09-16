@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "[
 		Commonly used console input and output mechanisms. 
 		This class may be used as ancestor by classes needing its facilities.
@@ -42,7 +42,8 @@ class CONSOLE inherit
 			dispose, read_to_string, back, read_line_thread_aware,
 			read_stream_thread_aware, read_word_thread_aware,
 			read_integer_with_no_type,
-			ctoi_convertor
+			ctoi_convertor,
+			new_cursor
 		end
 
 	ANY
@@ -107,6 +108,18 @@ feature {NONE} -- Cursor movement
 	back
 			-- Not supported on console
 		do
+		end
+
+feature -- Iteration
+
+	new_cursor: FILE_ITERATION_CURSOR
+			-- <Precursor>
+		do
+			if is_open_read then
+				create Result.make_open_stdin
+			else
+				create Result.make_empty
+			end
 		end
 
 feature -- Input
@@ -247,14 +260,16 @@ feature -- Output
 			console_pc (file_pointer, c)
 		end
 
-	put_string, putstring (s: STRING)
+	put_string, putstring (s: READABLE_STRING_8)
 			-- Write `s' at end of default output.
 		local
+			n: like {READABLE_STRING_8}.count
 			external_s: ANY
 		do
-			if s.count /= 0 then
+			n := s.count
+			if n > 0 then
 				external_s := s.area
-				console_ps (file_pointer, $external_s, s.count)
+				console_ps (file_pointer, $external_s, n)
 			end
 		end
 
@@ -291,6 +306,15 @@ feature {NONE} -- Inapplicable
 	is_empty: BOOLEAN = False
 			-- Useless for CONSOLE class.
 			--| `empty' is false not to invalidate invariant clauses.
+
+feature {FILE_ITERATION_CURSOR} -- Iteration
+
+	console_def (number: INTEGER): POINTER
+			-- Convert `number' to the corresponding
+			-- file descriptor.
+		external
+			"C use %"eif_console.h%""
+		end
 
 feature {NONE} -- Implementation
 
@@ -333,13 +357,6 @@ feature {NONE} -- Implementation
 			Result := file_gss (file_pointer, a_string.area.item_address (pos - 1), nb)
 				-- `a_string' was externally modified, we need to reset its `hash_code'.
 			a_string.reset_hash_codes
-		end
-
-	console_def (number: INTEGER): POINTER
-			-- Convert `number' to the corresponding
-			-- file descriptor.
-		external
-			"C use %"eif_console.h%""
 		end
 
 	console_eof (file: POINTER): BOOLEAN
@@ -451,7 +468,7 @@ feature {NONE} -- Implementation
 		end
 
 note
-	copyright: "Copyright (c) 1984-2012, Eiffel Software and others"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software and others"
 	license:   "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software

@@ -1,4 +1,4 @@
-note
+﻿note
 	description: "[
 			This module allows the use Session Based Authentication using Cookies to restrict access
 			by looking up users in the given providers.
@@ -21,6 +21,8 @@ inherit
 			install,
 			session_api
 		end
+
+	CMS_WITH_WEBAPI
 
 	CMS_HOOK_BLOCK
 
@@ -75,14 +77,21 @@ feature {CMS_API} -- Module management
 				l_sql_storage.sql_execute_file_script (api.module_resource_location (Current, (create {PATH}.make_from_string ("scripts")).extended ("install.sql")), Void)
 
 				if l_sql_storage.has_error then
-					api.logger.put_error ("Could not initialize database for module [" + name + "]", generating_type)
+					api.report_error ("[" + name + "]: installation failed!", l_sql_storage.error_handler.as_string_representation)
 				else
 					Precursor {CMS_AUTH_MODULE_I} (api) -- Mark it as installed.
 				end
 			end
 		end
 
-feature {CMS_API} -- Access: API
+feature {CMS_EXECUTION} -- Administration
+
+	webapi: CMS_SESSION_AUTH_MODULE_WEBAPI
+		do
+			create Result.make (Current)
+		end
+
+feature {CMS_API, CMS_MODULE_WEBAPI} -- Access: API
 
 	session_api: detachable CMS_SESSION_API
 			-- <Precursor>	
@@ -176,7 +185,7 @@ feature {NONE} -- Implementation: routes
 				attached p_destination.value as v and then
 				v.is_valid_as_string_8
 			then
-				r.set_redirection (v.to_string_8)
+				r.set_redirection (secured_url_content (v.to_string_8))
 			else
 				r.set_redirection (req.absolute_script_url (""))
 			end
@@ -187,9 +196,8 @@ feature {NONE} -- Implementation: routes
 	handle_login_with_session (api: CMS_API; a_session_api: CMS_SESSION_API; req: WSF_REQUEST; res: WSF_RESPONSE)
 		local
 			r: CMS_RESPONSE
-			l_username, l_username_or_email, l_password: detachable READABLE_STRING_GENERAL
+			l_username_or_email, l_password: detachable READABLE_STRING_GENERAL
 			l_user: detachable CMS_USER
-			l_tmp_user: detachable CMS_TEMP_USER
 		do
 			if
 				attached {WSF_STRING} req.form_parameter ("username") as p_username and then
@@ -214,7 +222,7 @@ feature {NONE} -- Implementation: routes
 							attached p_destination.value as v and then
 							v.is_valid_as_string_8
 						then
-							r.set_redirection (v.to_string_8)
+							r.set_redirection (secured_url_content (v.to_string_8))
 						else
 							r.set_redirection ("")
 						end

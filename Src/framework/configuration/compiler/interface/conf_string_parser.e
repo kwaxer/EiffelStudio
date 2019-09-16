@@ -37,6 +37,7 @@ feature -- Basic operations
 			valid_values: ITERABLE [READABLE_STRING_GENERAL]
 			is_value_checked: BOOLEAN
 			is_value_case_sensitive: BOOLEAN
+			l_is_capability: BOOLEAN
 		do
 				-- Reset previous error message (if any).
 			error := Void
@@ -47,7 +48,7 @@ feature -- Basic operations
 				if delimiter_index = 0 then
 					delimiter_index := input.count + 1
 				end
-				option := setting_name (input, 1, delimiter_index - 1)
+				option := setting_or_capability_name (input, 1, delimiter_index - 1)
 				if attached option then
 						-- The option name is correct, but the value is missing.
 					error := conf_interface_names.e_parse_string_missing_value (option)
@@ -58,49 +59,66 @@ feature -- Basic operations
 			elseif delimiter_index = 1 then
 				error := conf_interface_names.e_parse_string_missing_name (input)
 			else
-				option := setting_name (input, 1, delimiter_index - 1)
+				option := setting_or_capability_name (input, 1, delimiter_index - 1)
 				if attached option then
+					l_is_capability := False
 					is_value_case_sensitive := True
 					if option.same_string_general (s_concurrency) then
+						l_is_capability := True
 						valid_values := concurrency_names
 						is_value_case_sensitive := False
-					elseif option.same_string_general (s_platform) then
-						valid_values := platform_names
+					elseif option.same_string_general (s_void_safety) then
+						l_is_capability := True
+						valid_values := void_safety_names
 						is_value_case_sensitive := False
 					elseif boolean_settings.has_key (option) then
 						valid_values := configuration_boolean_values
 						is_value_case_sensitive := False
-					elseif option.same_string_general (s_msil_generation_type) then
-						valid_values := msil_generation_type_values
-						value := msil_generation_type_value (input, delimiter_index + 1, input.count)
-						is_value_checked := True
-					elseif option.same_string_general (s_msil_clr_version) then
-						valid_values := clr_runtimes.item
-					elseif option.same_string_general (s_msil_classes_per_module) then
-						value := msil_classes_per_module_value (input, delimiter_index + 1, input.count)
-						valid_values := <<{STRING_32} "1 - 65535">>
-						is_value_checked := True
+					elseif option.same_string_general (s_dead_code_removal) then
+						valid_values := dead_code_names
+						is_value_case_sensitive := False
 					elseif option.same_string_general (s_inlining_size) then
 						value := inlining_size_value (input, delimiter_index + 1, input.count)
 						valid_values := <<{STRING_32} "0 - 100">>
 						is_value_checked := True
+					elseif option.same_string_general (s_manifest_array_type) then
+						valid_values := array_override_names
+						is_value_case_sensitive := False
+					elseif option.same_string_general (s_msil_classes_per_module) then
+						value := msil_classes_per_module_value (input, delimiter_index + 1, input.count)
+						valid_values := <<{STRING_32} "1 - 65535">>
+						is_value_checked := True
+					elseif option.same_string_general (s_msil_clr_version) then
+						valid_values := clr_runtimes.item
+					elseif option.same_string_general (s_msil_generation_type) then
+						valid_values := msil_generation_type_values
+						value := msil_generation_type_value (input, delimiter_index + 1, input.count)
+						is_value_checked := True
+					elseif option.same_string_general (s_platform) then
+						valid_values := platform_names
+						is_value_case_sensitive := False
 					end
 					if is_value_checked then
 							-- There is nothing to be done.
 					elseif attached valid_values then
-							-- Check if value is a valid constant.
+							-- Check if specified value is a valid constant.
 						value := value_from_list (valid_values, input, delimiter_index, is_value_case_sensitive)
 					else
 							-- The setting value is an arbitrary string.
 						value := input.substring (delimiter_index + 1, input.count)
 					end
-					if attached value then
-							-- This is a valid setting, add it.
-						settings.add_setting (option, value)
-					else
+					if not attached value then
 							-- The option value is invalid.
 						error := conf_interface_names.e_parse_string_invalid_value
 							(input.head (delimiter_index - 1), input.substring (delimiter_index + 1, input.count), valid_values)
+					elseif l_is_capability then
+						settings.add_capability (option, value)
+					elseif option.same_string_general (s_dead_code_removal) then
+						settings.changeable_internal_options.dead_code.put (value)
+					elseif option.same_string_general (s_manifest_array_type) then
+						settings.changeable_internal_options.array_override.put (value)
+					else
+						settings.add_setting (option, value)
 					end
 				else
 						-- The option name is not found.
@@ -125,27 +143,36 @@ feature {NONE} -- Search
 	available_configuration_option_names: ARRAYED_LIST [READABLE_STRING_GENERAL]
 			-- Available option names.
 		do
-			create Result.make (10)
-			Result.force (s_concurrency)
-			Result.force (s_platform)
-
+			create Result.make (20)
+			Result.compare_objects
 			across
 				boolean_options as ic
 			loop
 				Result.force (ic.item)
 			end
-			Result.force (s_msil_generation_type)
-			Result.force (s_msil_clr_version)
-			Result.force (s_msil_classes_per_module)
-			Result.force (s_inlining_size)
-			Result.force ("...") --  arbitrary option name
+			across
+				known_settings as s
+			loop
+				if not Result.has (s.item) then
+					Result.force (s.item)
+				end
+			end
+			across
+				known_capabilities as s
+			loop
+				if not Result.has (s.item) then
+					Result.force (s.item)
+				end
+			end
+			;(create {QUICK_SORTER [like available_configuration_option_names.item]}.make
+				(create {STRING_COMPARATOR}.make)).sort (Result)
 		end
 
 	value_from_list (list: ITERABLE [READABLE_STRING_GENERAL]; input: READABLE_STRING_32; delimiter_index: INTEGER; is_value_case_sensitive: BOOLEAN): detachable READABLE_STRING_32
 			-- A value specified in string `input' after value delimited index `delimited_index' that matches one of values specified in `list' (if any).
 			-- If `is_value_case_sensitive` is False, compare name caseless, otherwise compare strictly.
 		require
-			valid_delimter_index: input.valid_index (delimiter_index) and input.valid_index (delimiter_index + 1)
+			valid_delimiter_index: input.valid_index (delimiter_index) and input.valid_index (delimiter_index + 1)
 		local
 			l_name_count, l_input_count: INTEGER
 			l_found: BOOLEAN
@@ -172,7 +199,7 @@ feature {NONE} -- Search
 		end
 
 ;note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

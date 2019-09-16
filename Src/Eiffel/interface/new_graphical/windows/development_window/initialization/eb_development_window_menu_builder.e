@@ -320,6 +320,7 @@ feature {EB_EXTERNAL_COMMANDS_EDITOR} -- Menu Building
 			l_cmd: EB_EDITOR_COMMAND
 			l_os_cmd: EB_ON_SELECTION_COMMAND
 			l_ln_cmd: EB_TOGGLE_LINE_NUMBERS_COMMAND
+			l_insert_symb: EB_INSERT_SYMBOL_EDITOR_COMMAND
 			l_find_brace_cmd: EB_FIND_MATCHING_BRACE_COMMAND
 
 			l_command_controller: EB_EDITOR_COMMAND_CONTROLLER
@@ -422,6 +423,18 @@ feature {EB_EXTERNAL_COMMANDS_EDITOR} -- Menu Building
 			auto_recycle (l_command_menu_item)
 			develop_window.commands.editor_commands.extend (l_cmd)
 			develop_window.menus.edit_menu.extend (l_command_menu_item)
+
+				-- Insert Symbols
+			create l_insert_symb.make (develop_window)
+			l_insert_symb.set_is_for_main_editors (True)
+			l_command_menu_item := l_insert_symb.new_menu_item
+			l_command_controller.add_edition_command (l_insert_symb)
+			auto_recycle (l_command_menu_item)
+			develop_window.commands.editor_commands.extend (l_insert_symb)
+			develop_window.menus.edit_menu.extend (l_command_menu_item)
+
+				-- Separator --------------------------------------
+			develop_window.menus.edit_menu.extend (create {EV_MENU_SEPARATOR})
 
 				-- Replace
 			create l_cmd.make
@@ -817,6 +830,11 @@ feature {EB_EXTERNAL_COMMANDS_EDITOR} -- Menu Building
 
 				-- Cancel
 			l_command_menu_item := develop_window.project_cancel_cmd.new_menu_item
+			auto_recycle (l_command_menu_item)
+			l_project_menu.extend (l_command_menu_item)
+
+				-- Clean recompilation
+			l_command_menu_item := develop_window.clean_compile_project_cmd.new_menu_item
 			auto_recycle (l_command_menu_item)
 			l_project_menu.extend (l_command_menu_item)
 
@@ -1235,6 +1253,7 @@ feature {EB_EXTERNAL_COMMANDS_EDITOR} -- Menu Building
 		do
 			l_menu := develop_window.window_manager.new_menu
 
+			l_menu.extend (develop_window.commands.reload_current_panel_command.new_menu_item)
 			l_menu.extend (develop_window.commands.close_current_panel_command.new_menu_item)
 			l_menu.extend (develop_window.commands.close_all_tab_command.new_menu_item)
 			l_menu.extend (develop_window.commands.close_all_but_current_command.new_menu_item)
@@ -1643,7 +1662,7 @@ feature -- Docking library menu items
 		end
 
 note
-	copyright: "Copyright (c) 1984-2018, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

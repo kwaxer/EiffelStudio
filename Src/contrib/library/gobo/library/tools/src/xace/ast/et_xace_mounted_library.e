@@ -5,12 +5,16 @@ note
 		"Xace mounted libraries"
 
 	library: "Gobo Eiffel Tools Library"
-	copyright: "Copyright (c) 2002-2014, Eric Bezault and others"
+	copyright: "Copyright (c) 2002-2019, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
 
 class ET_XACE_MOUNTED_LIBRARY
+
+obsolete
+
+	"Use ET_ECF_* classes instead. [2019-03-17]"
 
 inherit
 
@@ -45,10 +49,6 @@ feature {NONE} -- Initialization
 
 feature -- Status report
 
-	is_root: BOOLEAN
-			-- Is current library mounted directly to the top level
-			-- system or library?
-
 	same_library_prefix (other: ET_XACE_MOUNTED_LIBRARY): BOOLEAN
 			-- Do `Current' and `other' have the same library prefix?
 		require
@@ -61,16 +61,6 @@ feature -- Status report
 			else
 				Result := (library_prefix = Void)
 			end
-		end
-
-feature -- Status setting
-
-	set_root (b: BOOLEAN)
-			-- Set `is_root' to `b'.
-		do
-			is_root := b
-		ensure
-			root_set: is_root = b
 		end
 
 feature -- Access

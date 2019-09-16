@@ -20,7 +20,8 @@ create
 	make, make_with_name, make_with_path,
 	make_open_read, make_open_write, make_open_append,
 	make_open_read_write, make_create_read_write,
-	make_open_read_append
+	make_open_read_append,
+	make_open_temporary, make_open_temporary_with_prefix
 
 feature -- Status report
 
@@ -94,13 +95,13 @@ feature -- Output
 			end
 		end
 
-	put_real, putreal (r: REAL_32)
+	put_real, putreal, put_real_32 (r: REAL_32)
 			-- Write binary value of `r' at current position.
 		do
 			file_prb (file_pointer, r)
 		end
 
-	put_double, putdouble (d: REAL_64)
+	put_double, putdouble, put_real_64 (d: REAL_64)
 			-- Write binary value `d' at current position.
 		do
 			file_pdb (file_pointer, d)
@@ -184,14 +185,14 @@ feature -- Input
 			last_natural_64 := integer_buffer.read_natural_64 (0)
 		end
 
-	read_real, readreal
+	read_real, readreal, read_real_32
 			-- Read the binary representation of a new real
 			-- from file. Make result available in `last_real'.
 		do
 			last_real := file_grb (file_pointer)
 		end
 
-	read_double, readdouble
+	read_double, readdouble, read_real_64
 			-- Read the binary representation of a new double
 			-- from file. Make result available in `last_double'.
 		do
@@ -226,6 +227,17 @@ feature -- Input
 			Result := file_gss (file_pointer, a_string.area.item_address (pos - 1), nb)
 				-- `a_string' was externally modified, we need to reset its `hash_code'.
 			a_string.reset_hash_codes
+		end
+
+feature {FILE_ITERATION_CURSOR} -- Iteration
+
+	file_fread (dest: POINTER; elem_size, nb_elems: INTEGER; file: POINTER): INTEGER
+			-- Read `nb_elems' of size `elem_size' in file `file' and store them
+			-- in location `dest'.
+		external
+			"C signature (void *, size_t, size_t, FILE *): EIF_INTEGER use <stdio.h>"
+		alias
+			"fread"
 		end
 
 feature {NONE} -- Implementation
@@ -317,21 +329,12 @@ feature {NONE} -- Implementation
 			"eif_file_pdb"
 		end
 
-	file_fread (dest: POINTER; elem_size, nb_elems: INTEGER; file: POINTER): INTEGER
-			-- Read `nb_elems' of size `elem_size' in file `file' and store them
-			-- in location `dest'.
-		external
-			"C signature (void *, size_t, size_t, FILE *): EIF_INTEGER use <stdio.h>"
-		alias
-			"fread"
-		end
-
 invariant
 
 	not_plain_text: not is_plain_text
 
 note
-	copyright: "Copyright (c) 1984-2017, Eiffel Software and others"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software and others"
 	license:   "Eiffel Forum License v2 (see http://www.eiffel.com/licensing/forum.txt)"
 	source: "[
 			Eiffel Software

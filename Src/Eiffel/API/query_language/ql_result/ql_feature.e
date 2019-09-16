@@ -2,7 +2,6 @@ note
 	description: "Object that represents a feature item used in Eiffel query language"
 	legal: "See notice at end of class."
 	status: "See notice at end of class."
-	author: ""
 	date: "$Date$"
 	revision: "$Revision$"
 
@@ -12,9 +11,7 @@ deferred class
 inherit
 	QL_CODE_STRUCTURE_ITEM
 		redefine
-			is_equal,
-			is_compiled,
-			wrapped_domain
+			is_equal
 		end
 
 feature -- Access
@@ -82,12 +79,9 @@ feature -- Status report
 
 	is_visible: BOOLEAN
 			-- Is current visible from source domain level?
-		local
-			l_class: QL_CLASS
 		do
-			l_class ?= parent
-			check l_class /= Void end
-			Result := l_class.is_visible
+			check parent_is_class: attached {QL_CLASS} parent end
+			Result := attached {QL_CLASS} parent as l_class and then l_class.is_visible
 		end
 
 	is_equal (other: like Current): BOOLEAN
@@ -114,7 +108,7 @@ invariant
 	parent_valid: parent /= Void implies parent.is_class and parent.is_valid_domain_item
 
 note
-	copyright: "Copyright (c) 1984-2013, Eiffel Software"
+	copyright: "Copyright (c) 1984-2018, Eiffel Software"
 	license: "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

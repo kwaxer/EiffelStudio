@@ -2004,7 +2004,11 @@ feature {NONE} -- Visitors
 				if a_node.is_boxing or else not l_expr_type.is_basic then
 					il_generator.generate_metamorphose (l_expr_type)
 				else
-					generate_il_eiffel_metamorphose (l_expr_type)
+					if attached {BASIC_A} l_expr_type as b then
+						generate_il_eiffel_metamorphose (b)
+					else
+						check from_condition: False then end
+					end
 				end
 			end
 		end
@@ -2839,9 +2843,17 @@ feature {NONE} -- Visitors
 			if a_node.is_dotnet_string then
 				il_generator.generate_once_string (a_node.number - 1, a_node.value_32, string_type_cil)
 			elseif a_node.is_string_32 then
-				il_generator.generate_once_string (a_node.number - 1, a_node.value_32, string_type_string_32)
+				if a_node.is_immutable then
+					il_generator.generate_once_string (a_node.number - 1, a_node.value_32, string_type_immutable_string_32)
+				else
+					il_generator.generate_once_string (a_node.number - 1, a_node.value_32, string_type_string_32)
+				end
 			else
-				il_generator.generate_once_string (a_node.number - 1, a_node.value_32, string_type_string)
+				if a_node.is_immutable then
+					il_generator.generate_once_string (a_node.number - 1, a_node.value_32, string_type_immutable_string_8)
+				else
+					il_generator.generate_once_string (a_node.number - 1, a_node.value_32, string_type_string)
+				end
 			end
 		end
 
@@ -3096,9 +3108,17 @@ feature {NONE} -- Visitors
 				il_generator.put_system_string_32 (a_node.value_32)
 			else
 				if a_node.is_string_32 then
-					il_generator.put_manifest_string_32 (a_node.value_32)
+					if a_node.is_immutable then
+						il_generator.put_immutable_manifest_string_32 (a_node.value_32)
+					else
+						il_generator.put_manifest_string_32 (a_node.value_32)
+					end
 				else
-					il_generator.put_manifest_string (a_node.value_32)
+					if a_node.is_immutable then
+						il_generator.put_immutable_manifest_string_8 (a_node.value_32)
+					else
+						il_generator.put_manifest_string (a_node.value_32)
+					end
 				end
 			end
 		end
@@ -3360,7 +3380,11 @@ feature {NONE} -- Implementation
 							-- Basic type is attached to Eiffel reference type,
 							-- so basic type has to be represented by Eiffel type
 							-- rather than by built-in IL type.
-						generate_il_eiffel_metamorphose (l_expression_type)
+						if attached {BASIC_A} l_expression_type as b then
+							generate_il_eiffel_metamorphose (b)
+						else
+							check from_condition: False then end
+						end
 					else
 						il_generator.generate_external_metamorphose (l_expression_type)
 					end
@@ -3368,12 +3392,11 @@ feature {NONE} -- Implementation
 			end
 		end
 
-	generate_il_eiffel_metamorphose (a_type: TYPE_A)
+	generate_il_eiffel_metamorphose (a_type: BASIC_A)
 			-- Generate a metamorphose of `a_type' into a _REF type.
 		require
 			is_valid: is_valid
 			a_type_not_void: a_type /= Void
-			a_type_is_basic: a_type.is_basic
 		do
 			il_generator.generate_eiffel_metamorphose (a_type)
 		end
@@ -3391,7 +3414,11 @@ feature {NONE} -- Implementation
 		do
 			if a_target_type /= Void and then a_type.is_basic and then not a_target_type.is_true_external then
 					-- Box object.
-				generate_il_eiffel_metamorphose (a_type)
+				if attached {BASIC_A} a_type as b then
+					generate_il_eiffel_metamorphose (b)
+				else
+					check from_condition: False then end
+				end
 				if not a_real_metamorphose then
 						-- Get address of an object.
 					il_generator.generate_load_address (a_type)
@@ -3523,10 +3550,14 @@ feature {NONE} -- Implementation: binary operators
 					end
 				else
 					if l_same_type then
-						il_generator.generate_binary_operator (an_opcode, l_left_type.is_natural)
-					else
-						il_generator.generate_binary_operator (an_opcode, l_type.is_natural)
+						l_type := l_left_type
 					end
+					il_generator.generate_binary_operator (an_opcode,
+							-- Generate unsigned comparison for natural numbers.
+						l_type.is_natural or else
+							-- Generate unordered comparison for real numbers with equality because the result will be inverted,
+							-- and IEEE 754 standard behavior is expected.
+						((an_opcode = il_ge or an_opcode = il_le) and then (l_type.is_real_32 or else l_type.is_real_64)))
 				end
 			else
 				a_node.nested_b.process (Current)
@@ -4910,7 +4941,7 @@ feature {NONE} -- Convenience
 note
 	date: "$Date$"
 	revision: "$Revision$"
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[

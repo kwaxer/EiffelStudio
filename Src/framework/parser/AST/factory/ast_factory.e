@@ -143,7 +143,15 @@ feature -- Parser Access
 feature -- Typing
 
 	keyword_id_type: TUPLE [keyword: detachable KEYWORD_AS; id: detachable ID_AS; line, column: INTEGER; filename: like {ERROR}.file_name]
-			-- Type for `new_keyowrd_id_as'.
+			-- Type for `new_keyword_id_as'.
+		do
+			check False then end
+		ensure
+			is_called: False
+		end
+
+	symbol_id_type: TUPLE [symbol: detachable SYMBOL_AS; id: detachable ID_AS; line, column: INTEGER; filename: like {ERROR}.file_name]
+			-- Type for `new_symbol_id_as'.
 		do
 			check False then end
 		ensure
@@ -364,11 +372,7 @@ feature -- Value AST creation
 			u: UTF_CONVERTER
 		do
 				-- Would be nice to not have to create a INTEGER_AS to get the character value.
-			backup_match_list_count
-			disable_match_list_extension
-			l_integer := new_integer_value (a_psr, '+', Void, buffer, Void)
-			enable_match_list_extension
-			resume_match_list_count
+			l_integer := new_temporary_integer_value (a_psr, '+', buffer)
 			if l_integer /= Void then
 				if l_integer.natural_64_value <= {NATURAL_32}.Max_value then
 					Result := new_character_as (l_integer.natural_32_value.to_character_32, a_psr.line, a_psr.column, a_psr.position, roundtrip_buffer.count,
@@ -385,7 +389,17 @@ feature -- Value AST creation
 			end
 		end
 
-	new_integer_value (a_psr: EIFFEL_SCANNER_SKELETON; sign_symbol: CHARACTER; a_type: detachable TYPE_AS; buffer: STRING; s_as: detachable SYMBOL_AS): detachable INTEGER_AS
+	new_temporary_integer_value (a_psr: EIFFEL_SCANNER_SKELETON; sign_symbol: CHARACTER; buffer: READABLE_STRING_8): detachable INTEGER_AS
+				-- Useful to create a INTEGER_AS anhd get the associated numeric value.
+		do
+			backup_match_list_count
+			disable_match_list_extension
+			Result := new_integer_value (a_psr, sign_symbol, Void, buffer, Void)
+			enable_match_list_extension
+			resume_match_list_count
+		end
+
+	new_integer_value (a_psr: EIFFEL_SCANNER_SKELETON; sign_symbol: CHARACTER; a_type: detachable TYPE_AS; buffer: READABLE_STRING_8; s_as: detachable SYMBOL_AS): detachable INTEGER_AS
 			-- New integer value.
 		require
 			buffer_not_void: buffer /= Void
@@ -421,8 +435,7 @@ feature -- Value AST creation
 				if Result = Void or else not Result.is_initialized then
 					if sign_symbol = '-' then
 							-- Add `-' for a better reporting.
-						buffer.precede ('-')
-						a_psr.report_integer_too_small_error (a_type, buffer)
+						a_psr.report_integer_too_small_error (a_type, "-" + buffer)
 					else
 						a_psr.report_integer_too_large_error (a_type, buffer)
 					end
@@ -432,30 +445,29 @@ feature -- Value AST creation
 			end
 		end
 
-	new_real_value (a_psr: EIFFEL_SCANNER_SKELETON; is_signed: BOOLEAN; sign_symbol: CHARACTER; a_type: detachable TYPE_AS; buffer: STRING; s_as: detachable SYMBOL_AS): detachable REAL_AS
+	new_real_value (a_psr: EIFFEL_SCANNER_SKELETON; is_signed: BOOLEAN; sign_symbol: CHARACTER; a_type: detachable TYPE_AS; buffer: READABLE_STRING_8; s_as: detachable SYMBOL_AS): detachable REAL_AS
 			-- New real value.
 		require
 			buffer_not_void: buffer /= Void
 			a_psr_not_void: a_psr /= Void
 		local
-			l_buffer: STRING
+			l_buffer: READABLE_STRING_8
 		do
 			validate_integer_real_type (a_psr, a_type, buffer, False)
 			if is_valid_integer_real then
 				if is_signed and sign_symbol = '-' then
-					l_buffer := buffer.string
-					buffer.precede ('-')
+					l_buffer := "-" + buffer
 				else
 					l_buffer := buffer
 				end
-				Result := new_real_as (a_type, buffer, l_buffer, s_as, a_psr.line, a_psr.column, a_psr.position, a_psr.text_count,
+				Result := new_real_as (a_type, l_buffer, buffer, s_as, a_psr.line, a_psr.column, a_psr.position, a_psr.text_count,
 					a_psr.character_column, a_psr.character_position, a_psr.unicode_text_count)
 			end
 		end
 
 feature {NONE} -- Validation
 
-	validate_integer_real_type (a_psr: EIFFEL_SCANNER_SKELETON; a_type: detachable TYPE_AS; buffer: STRING; for_integer: BOOLEAN)
+	validate_integer_real_type (a_psr: EIFFEL_SCANNER_SKELETON; a_type: detachable TYPE_AS; buffer: READABLE_STRING_8; for_integer: BOOLEAN)
 			-- New integer value.
 		require
 			buffer_not_void: buffer /= Void
@@ -592,6 +604,20 @@ feature -- Roundtrip: leaf_as
 		do
 			create Result.make (a_code, a_scn.line, a_scn.column, a_scn.position, a_scn.text_count,
 				a_scn.character_column, a_scn.character_position, a_scn.unicode_text_count)
+		end
+
+	new_symbol_id_as (c: INTEGER; s: EIFFEL_SCANNER_SKELETON): detachable like symbol_id_type
+			-- New tuple with a symbol and an id for the current token (free operator).
+		require
+			attached s
+			valid_code:
+				c = {EIFFEL_TOKENS}.te_block_close or
+				c = {EIFFEL_TOKENS}.te_block_open or
+				c = {EIFFEL_TOKENS}.te_exists or
+				c = {EIFFEL_TOKENS}.te_forall or
+				c = {EIFFEL_TOKENS}.te_repeat
+		do
+			Result := [new_symbol_as (c, s), new_filled_id_as (s), s.line, s.column, s.filename]
 		end
 
 	new_square_symbol_as (a_code: INTEGER; a_scn: EIFFEL_SCANNER_SKELETON): detachable SYMBOL_AS
@@ -1565,7 +1591,7 @@ feature -- Access
 			end
 		end
 
-	new_integer_as (t: detachable TYPE_AS; s: BOOLEAN; v: detachable STRING; buf: detachable STRING; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
+	new_integer_as (t: detachable TYPE_AS; s: BOOLEAN; v: detachable STRING; buf: detachable READABLE_STRING_8; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
 			-- New INTEGER_AS node
 		do
 			if v /= Void then
@@ -1574,7 +1600,7 @@ feature -- Access
 			end
 		end
 
-	new_integer_hexa_as (t: detachable TYPE_AS; s: CHARACTER; v: detachable STRING; buf: STRING; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
+	new_integer_hexa_as (t: detachable TYPE_AS; s: CHARACTER; v: detachable STRING; buf: READABLE_STRING_8; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
 			-- New INTEGER_AS node
 		do
 			if v /= Void then
@@ -1583,7 +1609,7 @@ feature -- Access
 			end
 		end
 
-	new_integer_octal_as (t: detachable TYPE_AS; s: CHARACTER; v: detachable STRING; buf: STRING; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
+	new_integer_octal_as (t: detachable TYPE_AS; s: CHARACTER; v: detachable STRING; buf: READABLE_STRING_8; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
 			-- New INTEGER_AS node
 		do
 			if v /= Void then
@@ -1592,7 +1618,7 @@ feature -- Access
 			end
 		end
 
-	new_integer_binary_as (t: detachable TYPE_AS; s: CHARACTER; v: detachable STRING; buf: STRING; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
+	new_integer_binary_as (t: detachable TYPE_AS; s: CHARACTER; v: detachable STRING; buf: READABLE_STRING_8; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable INTEGER_AS
 			-- New INTEGER_AS node
 		do
 			if v /= Void then
@@ -1623,7 +1649,16 @@ feature -- Access
 			-- 	across expr is x -- when `is_resticted`
 		do
 			if e /= Void and i /= Void then
-				create Result.initialize (a, e, b, i, is_restricted)
+				create Result.make_keyword (a, e, b, i, is_restricted)
+			end
+		end
+
+	new_symbolic_iteration_as (i: detachable ID_AS; a: detachable SYMBOL_AS; e: detachable EXPR_AS; b: detachable SYMBOL_AS): detachable ITERATION_AS
+			-- New ITERATION AST node for an iteration part of a loop in the form
+			-- "`i` ∈ `e` |"
+		do
+			if attached i and attached e then
+				create Result.make_symbolic (i, a, e, b)
 			end
 		end
 
@@ -1656,20 +1691,20 @@ feature -- Access
 
 	new_loop_as (t: detachable ITERATION_AS; f: detachable EIFFEL_LIST [INSTRUCTION_AS]; i: detachable EIFFEL_LIST [TAGGED_AS];
 			v: detachable VARIANT_AS; s: detachable EXPR_AS; c: detachable EIFFEL_LIST [INSTRUCTION_AS];
-			e, f_as, i_as, u_as, l_as: detachable KEYWORD_AS): detachable LOOP_AS
+			e, f_as, i_as, u_as, l_as: detachable KEYWORD_AS; r, bc: detachable SYMBOL_AS): detachable LOOP_AS
 			-- New LOOP AST node
 		do
-			if (t /= Void or s /= Void) and e /= Void then
-				create Result.initialize (t, f, i, v, s, c, e, f_as, i_as, u_as, l_as)
+			if (t /= Void or s /= Void) and (attached e or attached bc) then
+				create Result.initialize (t, f, i, v, s, c, e, f_as, i_as, u_as, l_as, r, bc)
 			end
 		end
 
 	new_loop_expr_as (f: detachable ITERATION_AS; w: detachable KEYWORD_AS; i: detachable EIFFEL_LIST [TAGGED_AS];
-			u: detachable KEYWORD_AS; c: detachable EXPR_AS; q: detachable KEYWORD_AS; a: BOOLEAN; e: detachable EXPR_AS; v: detachable VARIANT_AS; k: detachable KEYWORD_AS): detachable LOOP_EXPR_AS
+			u: detachable KEYWORD_AS; c: detachable EXPR_AS; q: detachable KEYWORD_AS; s: detachable SYMBOL_AS; a: BOOLEAN; e: detachable EXPR_AS; v: detachable VARIANT_AS; k: detachable KEYWORD_AS): detachable LOOP_EXPR_AS
 			-- New LOOP expression AST node
 		do
 			if f /= Void and then e /= Void then
-				create Result.initialize (f, w, i, u, c, q, a, e, v, k)
+				create Result.initialize (f, w, i, u, c, q, s, a, e, v, k)
 			end
 		end
 
@@ -1786,7 +1821,7 @@ feature -- Access
 			end
 		end
 
-	new_real_as (t: detachable TYPE_AS; v: detachable STRING; buf: STRING; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable REAL_AS
+	new_real_as (t: detachable TYPE_AS; v: detachable READABLE_STRING_8; buf: READABLE_STRING_8; s_as: detachable SYMBOL_AS; l, c, p, n, cc, cp, cn: INTEGER): detachable REAL_AS
 			-- New REAL AST node
 		do
 			if v /= Void then
@@ -2114,11 +2149,11 @@ feature {NONE} -- Implementation
 
 note
 	ca_ignore:
-		"CA011", "CA011 — too many arguments",
-		"CA033", "CA033 — very long class"
+		"CA011", "CA011: too many arguments",
+		"CA033", "CA033: very long class"
 	date: "$Date$"
 	revision: "$Revision$"
-	copyright: "Copyright (c) 1984-2018, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

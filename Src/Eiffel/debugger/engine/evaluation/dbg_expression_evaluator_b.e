@@ -717,14 +717,12 @@ feature {BYTE_NODE} -- Visitor
 						attached {FEATURE_B} a_node.call as l_f_b and then
 						l_f_b.parameters /= Void and then
 						l_f_b.parameters.count = 1 and then
-						attached {PARAMETER_B} l_f_b.parameters.first as l_p_b
+						attached l_f_b.parameters.first as l_p_b and then
+						attached l_p_b.expression as l_e_b and then
+						attached l_e_b.evaluate as l_v_i
 					then
-						if attached {EXPR_B} l_p_b.expression as l_e_b then
-							if attached l_e_b.evaluate as l_v_i then
-								l_supported	:= True
-								evaluate_value_i (l_v_i, Void)
-							end
-						end
+						l_supported	:= True
+						evaluate_value_i (l_v_i, Void)
 					end
 				else
 					if l_type_to_create /= Void then
@@ -933,10 +931,14 @@ feature {BYTE_NODE} -- Visitor
 								--| parameters ...
 							params := parameter_values_from_parameters_b (a_node.parameters)
 							if not error_occurred then
-								if tmp_target_dump_value /= Void then
-									evaluate_routine (tmp_target_dump_value.value_address, tmp_target_dump_value, cl, fi, params)
+								if fi.is_class then
+									evaluate_class_routine (cl, fi, params)
 								else
-									evaluate_routine (context.address, Void, cl, fi, params)
+									if tmp_target_dump_value /= Void then
+										evaluate_routine (tmp_target_dump_value.value_address, tmp_target_dump_value, cl, fi, params)
+									else
+										evaluate_routine (context.address, Void, cl, fi, params)
+									end
 								end
 							end
 						elseif fi.is_attribute then
@@ -1054,7 +1056,7 @@ feature {BYTE_NODE} -- Visitor
 			l_tmp_result_value_backup := tmp_result
 			l_tmp_target_backup := tmp_target
 
-				-- ELSIF_EXPRESSION...
+				-- ELSEIF_EXPRESSION...
 			l_condition_value := standalone_evaluation_expr_b (a_node.condition)
 			if not error_occurred then
 				if
@@ -1558,14 +1560,12 @@ feature {BYTE_NODE} -- Visitor
 			l_tmp_target_backup: like tmp_target
 --			l_call_value: DBG_EVALUATED_VALUE
 --			l_value: DUMP_VALUE
-			l_type_i: CL_TYPE_A
 		do
 			debug ("refactor_fixme")
 				fixme ("Later when we have a way to ensure the unicity of TYPE instances, we'll need to update this part")
 			end
 			l_tmp_target_backup := tmp_target
-			l_type_i := resolved_real_type_in_context (a_node.type)
-			create_empty_instance_of (l_type_i)
+			create_empty_instance_of (resolved_real_type_in_context (a_node.type))
 -- FIXME: the following commented code seems to be useless, and it fixes bug#15888  (2009-06-01)
 --			if not error_occurred then
 --				l_call_value := tmp_result
@@ -2098,6 +2098,33 @@ feature {NONE} -- Evaluation: implementation
 			end
 		end
 
+	evaluate_class_routine (cl: CLASS_C; f: FEATURE_I; params: LIST [DUMP_VALUE])
+			-- Evaluate class routine `f' with parameters `params'
+		require
+			f /= Void
+			f_is_class_routine: f.is_class
+		do
+			if cl = Void then
+				dbg_error_handler.notify_error_evaluation ("Missing class information for non object call " + f.feature_name)
+			elseif cl.is_deferred then
+				dbg_error_handler.notify_error_evaluation ("Evaluation of class routine {" + cl.name + "}." + f.feature_name + " is not supported (deferred target type)!")
+			else
+					-- Instanciate empty object as the "target" of non object call.
+				prepare_dbg_evaluation
+				dbg_evaluator.create_empty_instance_of (cl.actual_type)
+				retrieve_dbg_evaluation
+				if
+					not error_occurred and then
+					attached tmp_result as res and then
+					attached res.value as dv
+				then
+					prepare_dbg_evaluation
+					Dbg_evaluator.evaluate_class_routine (dv.address, dv, cl, f, params)
+					retrieve_dbg_evaluation
+				end
+			end
+		end
+
 	evaluate_static_routine (a_addr: DBG_ADDRESS; a_target: DUMP_VALUE; cl: CLASS_C; f: FEATURE_I; params: LIST [DUMP_VALUE])
 			-- Evaluate static routine `f' with parameters `params'
 		require
@@ -2112,7 +2139,7 @@ feature {NONE} -- Evaluation: implementation
 					dbg_error_handler.notify_error_evaluation_call_on_void (f.feature_name)
 				else
 					prepare_dbg_evaluation
-					Dbg_evaluator.evaluate_routine (a_addr, a_target, cl, f, params, True)
+					Dbg_evaluator.evaluate_static_routine (a_addr, a_target, cl, f, params)
 					retrieve_dbg_evaluation
 				end
 			end
@@ -2199,11 +2226,9 @@ feature {NONE} -- Evaluation: implementation
 		end
 
 	is_equal_evaluation_on_values (a_left, a_right: DBG_EVALUATED_VALUE): BOOLEAN
-			-- Compare using `is_equal'
-		require else
-			same_type: values_with_same_type (a_left, a_right)
+			-- Compare using `is_equal`.
 		do
-			if attached application_execution as app then
+			if values_with_same_type (a_left, a_right) and then attached application_execution as app then
 				Result := app.is_equal_evaluation (a_left, a_right, dbg_error_handler)
 			else
 				dbg_error_handler.notify_error_exception_internal_issue
@@ -2532,7 +2557,7 @@ feature {NONE} -- Implementation
 		end
 
 note
-	copyright:	"Copyright (c) 1984-2018, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[
@@ -2563,4 +2588,4 @@ note
 			Customer support http://support.eiffel.com
 		]"
 
-end -- class DBG_EXPRESSION_EVALUATOR_B
+end

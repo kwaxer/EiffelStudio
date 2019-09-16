@@ -68,15 +68,14 @@ feature
 
 feature {NONE} -- Pixmap resources
 
-	Shared_pixmaps: EB_SHARED_PIXMAPS
-		once
-			create Result
-		end
-
-	frozen icons: ES_PIXMAPS_12X12
+	frozen icons: ES_SMALL_ICONS
 			-- Breakpoint icon resources
-		once
-			Result := shared_pixmaps.small_pixmaps
+		do
+				-- TODO review
+				-- once feature to load small_pixmaps based on the Monitor DPI.	
+				-- using object-less call
+				-- Date: 05/24/2019
+			Result := {EB_SHARED_PIXMAPS}.small_pixmaps
 		ensure
 			result_not_void: Result /= Void
 		end
@@ -122,7 +121,7 @@ feature {NONE} -- Pixmap resources
 		end
 
 note
-	copyright: "Copyright (c) 1984-2011, Eiffel Software"
+	copyright: "Copyright (c) 1984-2019, Eiffel Software"
 	license:   "GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options: "http://www.eiffel.com/licensing"
 	copying: "[

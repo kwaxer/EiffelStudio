@@ -16,7 +16,7 @@ note
 	]"
 
 	library: "Gobo Eiffel Tools Library"
-	copyright: "Copyright (c) 2008-2017, Eric Bezault and others"
+	copyright: "Copyright (c) 2008-2019, Eric Bezault and others"
 	license: "MIT License"
 	date: "$Date$"
 	revision: "$Revision$"
@@ -76,8 +76,10 @@ feature {NONE} -- Initialization
 	initialize
 			-- Initialize universe.
 		do
+			implicit_attachment_type_mark := tokens.implicit_attached_type_mark
 			create master_classes.make_map (3000)
 			master_classes.set_key_equality_tester (class_name_tester)
+			create master_class_mutex.make
 		end
 
 feature -- Initialization
@@ -107,7 +109,7 @@ feature -- Initialization
 			master_classes_do_recursive (agent {ET_MASTER_CLASS}.local_classes_do_all (agent {ET_CLASS}.reset_after_parsed_and_errors))
 		end
 
-	reset_classes_incremental_recursive
+	reset_classes_incremental_recursive (a_system_processor: ET_SYSTEM_PROCESSOR)
 			-- Reset parts of the classes (declared in current universe and recursively in universes
 			-- it depends on) which may not be valid anymore because of changes in other
 			-- classes. Re-processing these classes will not affect the parts which didn't
@@ -122,6 +124,8 @@ feature -- Initialization
 			-- to rebuild the feature table for this class. When the feature
 			-- table of a class has been rebuilt, we need to recheck the validity
 			-- of the feature calls in the clients of this class.
+		require
+			a_system_processor_not_void: a_system_processor /= Void
 		local
 			l_ancestors_status_checker: ET_ANCESTORS_STATUS_CHECKER
 			l_flattening_status_checker: ET_FLATTENING_STATUS_CHECKER
@@ -164,7 +168,7 @@ feature -- Initialization
 				-- flag will be cleared.
 			classes_do_if_recursive (agent {ET_CLASS}.set_interface_error, agent {ET_CLASS}.interface_checked)
 				-- It is possible to check the implementation of features
-				-- individiually without setting ET_CLASS.implementation_checked.
+				-- individually without setting {ET_CLASS}.implementation_checked.
 				-- It is safer to force a reset just in case we are in this situation.
 			classes_do_if_recursive (agent {ET_CLASS}.reset_after_interface_checked, agent {ET_CLASS}.not_implementation_checked)
 				-- Classes that had an implementation error need to be reprocessed.
@@ -178,16 +182,16 @@ feature -- Initialization
 				-- flag will be cleared.
 			classes_do_if_recursive (agent {ET_CLASS}.set_implementation_error, agent {ET_CLASS}.implementation_checked)
 				-- Reset ancestors building.
-			create l_ancestors_status_checker.make
+			create l_ancestors_status_checker.make (a_system_processor)
 			classes_do_if_recursive (agent l_ancestors_status_checker.process_class, agent {ET_CLASS}.ancestors_built)
 				-- Reset feature flattening.
-			create l_flattening_status_checker.make
+			create l_flattening_status_checker.make (a_system_processor)
 			classes_do_if_recursive (agent l_flattening_status_checker.process_class, agent {ET_CLASS}.features_flattened)
 				-- Reset interface checking.
-			create l_interface_status_checker.make
+			create l_interface_status_checker.make (a_system_processor)
 			classes_do_if_recursive (agent l_interface_status_checker.process_class, agent {ET_CLASS}.interface_checked)
 				-- Reset implementation checking.
-			create l_implementation_status_checker.make
+			create l_implementation_status_checker.make (a_system_processor)
 			classes_do_if_recursive (agent l_implementation_status_checker.process_class, agent {ET_CLASS}.implementation_checked)
 				-- Reset the modified status of all classes.
 			master_classes_do_recursive (agent {ET_MASTER_CLASS}.set_modified (False))
@@ -201,10 +205,12 @@ feature -- Initialization
 			master_classes_do_all (agent {ET_MASTER_CLASS}.local_classes_do_all (agent {ET_CLASS}.reset_errors))
 		end
 
-	reset_errors_recursive
+	reset_errors_recursive (a_system_processor: ET_SYSTEM_PROCESSOR)
 			-- Reset classes (declared in current universe and recursively in universes
 			-- it depends on) as they were before their first error was reported.
 			-- Errors will be reported again if classes are processed again.
+		require
+			a_system_processor_not_void: a_system_processor /= Void
 		local
 			l_reparse_needed: UT_TRISTATE
 		do
@@ -215,7 +221,7 @@ feature -- Initialization
 					-- Some classes which had a syntax error will be reparsed.
 					-- As a consequence, it is wiser to incrementally reset
 					-- the classes that depend on them.
-				reset_classes_incremental_recursive
+				reset_classes_incremental_recursive (a_system_processor)
 			end
 		end
 
@@ -318,6 +324,7 @@ feature -- Access
 		require
 			a_name_not_void: a_name /= Void
 		do
+			master_class_mutex.lock
 			master_classes.search (a_name)
 			if master_classes.found then
 				Result := master_classes.found_item
@@ -325,6 +332,7 @@ feature -- Access
 				create Result.make (a_name, Current)
 				master_classes.force_last_new (Result, a_name)
 			end
+			master_class_mutex.unlock
 		ensure
 			master_class_not_void: Result /= Void
 		end
@@ -341,10 +349,12 @@ feature -- Access
 			l_class_name: ET_IDENTIFIER
 		do
 			create l_class_name.make (a_name)
+			master_class_mutex.lock
 			master_classes.search (l_class_name)
 			if master_classes.found then
 				Result := master_classes.found_item
 			end
+			master_class_mutex.unlock
 		end
 
 	master_classes_by_name_recursive (a_name: STRING): DS_ARRAYED_LIST [ET_MASTER_CLASS]
@@ -784,16 +794,14 @@ feature -- Measurement
 feature -- Kernel types
 
 	any_type: ET_CLASS_TYPE
-			-- Class type "ANY", with implicit 'attached' type mark
+			-- Class type "[attached] ANY",
+			-- where '[attached]' is an implicit type mark
 
 	detachable_any_type: ET_CLASS_TYPE
 			-- Class type "detachable ANY"
 
 	detachable_separate_any_type: ET_CLASS_TYPE
 			-- Class type "detachable separate ANY"
-
-	separate_any_type: ET_CLASS_TYPE
-			-- Class type "separate ANY"
 
 	any_parent: ET_PARENT
 			-- Default parent
@@ -805,13 +813,21 @@ feature -- Kernel types
 			-- Default client clause
 
 	array_any_type: ET_CLASS_TYPE
-			-- Class type "ARRAY [ANY]", with implicit 'attached' type mark
+			-- Class type "[attached] ARRAY [[attached] ANY]",
+			-- where '[attached]' is an implicit type mark
 
 	array_detachable_any_type: ET_CLASS_TYPE
-			-- Class type "ARRAY [detachable ANY]", with implicit 'attached' type mark
+			-- Class type "[attached] ARRAY [detachable ANY]",
+			-- where '[attached]' is an implicit type mark
 
-	array_like_current_type: ET_CLASS_TYPE
-			-- Class type "ARRAY [like Current]", with implicit 'attached' type mark
+	array_none_type: ET_CLASS_TYPE
+			-- Class type "[attached] ARRAY [[attached] NONE]",
+			-- where '[attached]' is an implicit type mark
+
+	array_identity_type: ET_CLASS_TYPE
+			-- Class type "[attached] ARRAY [identity]",
+			-- where '[attached]' is an implicit type mark,
+			-- and 'identity' is 'like Current' with no type mark modifier
 
 	boolean_type: ET_CLASS_TYPE
 			-- Class type "BOOLEAN"
@@ -829,19 +845,24 @@ feature -- Kernel types
 			-- Class type "DOUBLE"
 
 	exception_type: ET_CLASS_TYPE
-			-- Class type "detachable EXCEPTION", with implicit 'attached' type mark
+			-- Class type "[attached] EXCEPTION",
+			-- where '[attached]' is an implicit type mark
 
 	detachable_exception_type: ET_CLASS_TYPE
 			-- Class type "detachable EXCEPTION"
 
 	exception_manager_type: ET_CLASS_TYPE
-			-- Class type "EXCEPTION_MANAGER", with implicit 'attached' type mark
+			-- Class type "[attached] EXCEPTION_MANAGER",
+			-- where '[attached]' is an implicit type mark
 
-	function_type: ET_CLASS_TYPE
-			-- Class type "FUNCTION [TUPLE, ANY]", with implicit 'attached' type mark
+	function_identity_any_type: ET_CLASS_TYPE
+			-- Class type "[attached] FUNCTION [identity, [attached] ANY]",
+			-- where '[attached]' is an implicit type mark,
+			-- and 'identity' is 'like Current' with no type mark modifier
 
 	immutable_string_32_type: ET_CLASS_TYPE
-			-- Class type "IMMUTABLE_STRING_32", with implicit 'attached' type mark
+			-- Class type "[attached] IMMUTABLE_STRING_32",
+			-- where '[attached]' is an implicit type mark
 
 	integer_type: ET_CLASS_TYPE
 			-- Class type "INTEGER"
@@ -859,10 +880,12 @@ feature -- Kernel types
 			-- Class type "INTEGER_64"
 
 	ise_exception_manager_type: ET_CLASS_TYPE
-			-- Class type "ISE_EXCEPTION_MANAGER", with implicit 'attached' type mark
+			-- Class type "[attached] ISE_EXCEPTION_MANAGER",
+			-- where '[attached]' is an implicit type mark
 
-	iterable_detachable_any_type: ET_CLASS_TYPE
-			-- Class type "ITERABLE [detachable ANY]", with implicit 'attached' type mark
+	iterable_detachable_separate_any_type: ET_CLASS_TYPE
+			-- Class type "[attached] ITERABLE [detachable separate ANY]",
+			-- where '[attached]' is an implicit type mark
 
 	natural_type: ET_CLASS_TYPE
 			-- Class type "NATURAL"
@@ -880,7 +903,8 @@ feature -- Kernel types
 			-- Class type "NATURAL_64"
 
 	none_type: ET_CLASS_TYPE
-			-- Class type "NONE", with implicit 'attached' type mark
+			-- Class type "[attached] NONE",
+			-- where '[attached]' is an implicit type mark
 
 	detachable_none_type: ET_CLASS_TYPE
 			-- Class type "detachable NONE"
@@ -888,11 +912,15 @@ feature -- Kernel types
 	pointer_type: ET_CLASS_TYPE
 			-- Class type "POINTER"
 
-	predicate_like_current_type: ET_CLASS_TYPE
-			-- Class type "PREDICATE [like Current]", with implicit 'attached' type mark
+	predicate_identity_type: ET_CLASS_TYPE
+			-- Class type "[attached] PREDICATE [identity]",
+			-- where '[attached]' is an implicit type mark,
+			-- and 'identity' is 'like Current' with no type mark modifier
 
-	procedure_like_current_type: ET_CLASS_TYPE
-			-- Class type "PROCEDURE [like Current]", with implicit 'attached' type mark
+	procedure_identity_type: ET_CLASS_TYPE
+			-- Class type "[attached] PROCEDURE [identity]",
+			-- where '[attached]' is an implicit type mark,
+			-- and 'identity' is 'like Current' with no type mark modifier
 
 	real_type: ET_CLASS_TYPE
 			-- Class type "REAL"
@@ -903,78 +931,90 @@ feature -- Kernel types
 	real_64_type: ET_CLASS_TYPE
 			-- Class type "REAL_64"
 
-	routine_type: ET_CLASS_TYPE
-			-- Class type "ROUTINE [TUPLE]", with implicit 'attached' type mark
+	routine_identity_type: ET_CLASS_TYPE
+			-- Class type "[attached] ROUTINE [identity]",
+			-- where '[attached]' is an implicit type mark,
+			-- and 'identity' is 'like Current' with no type mark modifier
 
 	special_any_type: ET_CLASS_TYPE
-			-- Class type "SPECIAL [ANY]", with implicit 'attached' type mark
+			-- Class type "[attached] SPECIAL [[attached] ANY]",
+			-- where '[attached]' is an implicit type mark
 
 	special_detachable_any_type: ET_CLASS_TYPE
-			-- Class type "SPECIAL [detachable ANY]", with implicit 'attached' type mark
+			-- Class type "[attached] SPECIAL [detachable ANY]",
+			-- where '[attached]' is an implicit type mark
+
+	special_identity_type: ET_CLASS_TYPE
+			-- Class type "[attached] SPECIAL [identity]",
+			-- where '[attached]' is an implicit type mark,
+			-- and 'identity' is 'like Current' with no type mark modifier
 
 	string_type: ET_CLASS_TYPE
-			-- Class type "STRING", with implicit 'attached' type mark
+			-- Class type "[attached] STRING",
+			-- where '[attached]' is an implicit type mark
 
 	detachable_string_type: ET_CLASS_TYPE
 			-- Class type "detachable STRING"
 
 	string_8_type: ET_CLASS_TYPE
-			-- Class type "STRING_8", with implicit 'attached' type mark
+			-- Class type "[attached] STRING_8",
+			-- where '[attached]' is an implicit type mark
 
 	string_32_type: ET_CLASS_TYPE
-			-- Class type "STRING_32", with implicit 'attached' type mark
+			-- Class type "[attached] STRING_32",
+			-- where '[attached]' is an implicit type mark
 
 	system_object_type: ET_CLASS_TYPE
-			-- Type "SYSTEM_OBJECT" (in Eiffel for .NET), with implicit 'attached' type mark
+			-- Type "[attached] SYSTEM_OBJECT" (in Eiffel for .NET),
+			-- where '[attached]' is an implicit type mark
 
 	system_object_parents: ET_PARENT_LIST
 			-- Default parents for .NET classes
 
 	system_string_type: ET_CLASS_TYPE
-			-- Class type "SYSTEM_STRING" (in Eiffel for .NET), with implicit 'attached' type mark
+			-- Class type "[attached] SYSTEM_STRING" (in Eiffel for .NET),
+			-- where '[attached]' is an implicit type mark
 
 	tuple_type: ET_TUPLE_TYPE
-			-- Type "TUPLE", with implicit 'attached' type mark
+			-- Type "[attached] TUPLE",
+			-- where '[attached]' is an implicit type mark
 
 	detachable_tuple_type: ET_TUPLE_TYPE
 			-- Type "detachable TUPLE"
 
-	tuple_like_current_type: ET_TUPLE_TYPE
-			-- Type "TUPLE [like Current]", with implicit 'attached' type mark
+	tuple_identity_type: ET_TUPLE_TYPE
+			-- Type "[attached] TUPLE [identity]",
+			-- where '[attached]' is an implicit type mark,
+			-- and 'identity' is 'like Current' with no type mark modifier
 
 	unfolded_empty_tuple_actual_parameters: ET_ACTUAL_PARAMETERS
-			-- Actual generic parameters "[TUPLE]", with implicit 'attached' type mark,
+			-- Actual generic parameters "[[attached] TUPLE]", where '[attached]' is an implicit type mark,
 			-- used for Tuple-type-unfolding
 
-	type_any_type: ET_CLASS_TYPE
-			-- Class type "TYPE [ANY]"
-
-	type_type_any_type: ET_CLASS_TYPE
-			-- Class type "TYPE [TYPE [ANY]]"
-
 	type_detachable_any_type: ET_CLASS_TYPE
-			-- Class type "TYPE [detachable ANY]"
-
-	detachable_type_detachable_any_type: ET_CLASS_TYPE
-			-- Class type "detachable TYPE [detachable ANY]"
-
-	type_detachable_like_current_type: ET_CLASS_TYPE
-			-- Class type "TYPE [detachable like Current]"
+			-- Class type "[attached] TYPE [detachable ANY]",
+			-- where '[attached]' is an implicit type mark
 
 	detachable_type_exception_type: ET_CLASS_TYPE
-			-- Class type "detachable TYPE [EXCEPTION]"
+			-- Class type "detachable TYPE [[attached] EXCEPTION]",
+			-- where '[attached]' is an implicit type mark
 
 	type_detachable_exception_type: ET_CLASS_TYPE
-			-- Class type "TYPE [detachable EXCEPTION]", with implicit 'attached' type mark"
+			-- Class type "[attached] TYPE [detachable EXCEPTION]",
+			-- where '[attached]' is an implicit type mark
 
-	type_like_current_type: ET_CLASS_TYPE
-			-- Class type "TYPE [like Current]", with implicit 'attached' type mark"
+	type_detachable_like_current_type: ET_CLASS_TYPE
+			-- Class type "[attached] TYPE [detachable like Current]",
+			-- where '[attached]' is an implicit type mark
 
-	typed_pointer_any_type: ET_CLASS_TYPE
-			-- Class type "TYPED_POINTER [ANY]"
+	type_identity_type: ET_CLASS_TYPE
+			-- Class type [attached] TYPE [identity]",
+			-- where '[attached]' is an implicit type mark,
+			-- and 'identity' is 'like Current' with no type mark modifier
 
-	typed_pointer_like_current_type: ET_CLASS_TYPE
-			-- Class type "TYPED_POINTER [like Current]"
+	typed_pointer_identity_type: ET_CLASS_TYPE
+			-- Class type "TYPED_POINTER [identity]",
+			-- where 'identity' is 'like Current' with no type mark modifier
 
 	wide_character_type: ET_CLASS_TYPE
 			-- Class type "WIDE_CHARACTER"
@@ -985,12 +1025,16 @@ feature -- Kernel types
 				-- Note: make sure to call `set_any_type' before calling `set_array_type',
 				-- `set_function_type', `set_predicate_type', `set_procedure_type',
 				-- `set_routine_type', `set_special_type', `set_type_type' and
-				-- `set_typed_pointer_type', otherwise `any_type' is still Void when
+				-- `set_typed_pointer_type', otherwise `any_type' is not set when
 				-- `set_kernel_types' is called from the creation procedure.
 			set_any_type
+				-- Note: make sure to call `set_none_type' before calling `set_array_type',
+				-- otherwise `none_type' is not set when `set_kernel_types' is called from
+				-- the creation procedure.
+			set_none_type
 				-- Note: make sure to call `set_tuple_type' before calling `set_function_type',
 				-- `set_predicate_type', `set_procedure_type' and `set_routine_type', otherwise
-				-- `tuple_type' is still Void when `set_kernel_types' is called from the
+				-- `tuple_type' is not set when `set_kernel_types' is called from the
 				-- creation procedure.
 			set_tuple_type
 			set_array_type
@@ -1015,7 +1059,6 @@ feature -- Kernel types
 			set_natural_16_type
 			set_natural_32_type
 			set_natural_64_type
-			set_none_type
 			set_pointer_type
 			set_predicate_type
 			set_procedure_type
@@ -1043,11 +1086,10 @@ feature -- Kernel types
 		do
 			l_name := tokens.any_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create any_type.make (tokens.implicit_attached_type_mark, l_name, l_master_class)
 			create detachable_any_type.make (tokens.detachable_keyword, l_name, l_master_class)
 			create detachable_separate_any_type.make (tokens.detachable_separate_type_mark, l_name, l_master_class)
-			create separate_any_type.make (tokens.separate_keyword, l_name, l_master_class)
 				-- Implicit parent "ANY".
 			create any_parent.make (any_type, Void, Void, Void, Void, Void)
 			create any_parents.make_with_capacity (1)
@@ -1067,19 +1109,23 @@ feature -- Kernel types
 		do
 			l_name := tokens.array_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
-				-- Type "ARRAY [ANY]".
+			l_master_class.set_marked (True)
+				-- Type "[attached] ARRAY [[attached] ANY]".
 			create l_parameters.make_with_capacity (1)
 			l_parameters.put_first (any_type)
 			create array_any_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
-				-- Type "ARRAY [detachable ANY]".
+				-- Type "[attached] ARRAY [detachable ANY]".
 			create l_parameters.make_with_capacity (1)
 			l_parameters.put_first (detachable_any_type)
 			create array_detachable_any_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
-				-- Type "ARRAY [like Current]".
+				-- Type "[attached] ARRAY [[attached] NONE]".
 			create l_parameters.make_with_capacity (1)
-			l_parameters.put_first (tokens.like_current)
-			create array_like_current_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
+			l_parameters.put_first (none_type)
+			create array_none_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
+				-- Type "[attached] ARRAY [identity]".
+			create l_parameters.make_with_capacity (1)
+			l_parameters.put_first (tokens.identity_type)
+			create array_identity_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
 		end
 
 	set_boolean_type
@@ -1090,7 +1136,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.boolean_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create boolean_type.make (Void, l_name, l_master_class)
 		end
 
@@ -1102,7 +1148,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.character_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create character_type.make (Void, l_name, l_master_class)
 		end
 
@@ -1115,7 +1161,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.character_8_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create character_8_type.make (Void, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create character_8_convert_feature.make (character_8_type)
@@ -1130,7 +1176,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.character_32_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create character_32_type.make (Void, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create character_32_convert_feature.make (character_32_type)
@@ -1144,7 +1190,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.double_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create double_type.make (Void, l_name, l_master_class)
 		end
 
@@ -1156,7 +1202,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.exception_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create exception_type.make (tokens.implicit_attached_type_mark, l_name, l_master_class)
 			create detachable_exception_type.make (tokens.detachable_keyword, l_name, l_master_class)
 		end
@@ -1169,7 +1215,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.exception_manager_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create exception_manager_type.make (tokens.implicit_attached_type_mark, l_name, l_master_class)
 		end
 
@@ -1182,11 +1228,11 @@ feature -- Kernel types
 		do
 			l_name := tokens.function_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create l_parameters.make_with_capacity (2)
 			l_parameters.put_first (any_type)
-			l_parameters.put_first (tuple_type)
-			create function_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
+			l_parameters.put_first (tokens.identity_type)
+			create function_identity_any_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
 		end
 
 	set_immutable_string_32_type
@@ -1197,7 +1243,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.immutable_string_32_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create immutable_string_32_type.make (tokens.implicit_attached_type_mark, l_name, l_master_class)
 		end
 
@@ -1209,7 +1255,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.integer_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create integer_type.make (Void, l_name, l_master_class)
 		end
 
@@ -1222,7 +1268,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.integer_8_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create integer_8_type.make (Void, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create integer_8_convert_feature.make (integer_8_type)
@@ -1237,7 +1283,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.integer_16_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create integer_16_type.make (Void, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create integer_16_convert_feature.make (integer_16_type)
@@ -1252,7 +1298,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.integer_32_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create integer_32_type.make (Void, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create integer_32_convert_feature.make (integer_32_type)
@@ -1267,7 +1313,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.integer_64_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create integer_64_type.make (Void, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create integer_64_convert_feature.make (integer_64_type)
@@ -1281,7 +1327,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.ise_exception_manager_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create ise_exception_manager_type.make (tokens.implicit_attached_type_mark, l_name, l_master_class)
 		end
 
@@ -1294,11 +1340,11 @@ feature -- Kernel types
 		do
 			l_name := tokens.iterable_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
-				-- Type "ITERABLE [detachable ANY]".
+			l_master_class.set_marked (True)
+				-- Type "[attached] ITERABLE [detachable separate ANY]".
 			create l_parameters.make_with_capacity (1)
-			l_parameters.put_first (detachable_any_type)
-			create iterable_detachable_any_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
+			l_parameters.put_first (detachable_separate_any_type)
+			create iterable_detachable_separate_any_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
 		end
 
 	set_natural_type
@@ -1309,7 +1355,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.natural_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create natural_type.make (Void, l_name, l_master_class)
 		end
 
@@ -1322,7 +1368,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.natural_8_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create natural_8_type.make (Void, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create natural_8_convert_feature.make (natural_8_type)
@@ -1337,7 +1383,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.natural_16_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create natural_16_type.make (Void, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create natural_16_convert_feature.make (natural_16_type)
@@ -1352,7 +1398,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.natural_32_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create natural_32_type.make (Void, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create natural_32_convert_feature.make (natural_32_type)
@@ -1367,7 +1413,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.natural_64_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create natural_64_type.make (Void, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create natural_64_convert_feature.make (natural_64_type)
@@ -1382,7 +1428,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.none_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create none_type.make (tokens.implicit_attached_type_mark, l_name, l_master_class)
 			create detachable_none_type.make (tokens.detachable_keyword, l_name, l_master_class)
 			l_none_class := current_system.master_class (l_name)
@@ -1397,7 +1443,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.pointer_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create pointer_type.make (Void, l_name, l_master_class)
 		end
 
@@ -1410,11 +1456,11 @@ feature -- Kernel types
 		do
 			l_name := tokens.predicate_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
-				-- "PREDICATE [like Current]"
+			l_master_class.set_marked (True)
+				-- "[attached] PREDICATE [identity]"
 			create l_parameters.make_with_capacity (1)
-			l_parameters.put_first (tokens.like_current)
-			create predicate_like_current_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
+			l_parameters.put_first (tokens.identity_type)
+			create predicate_identity_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
 		end
 
 	set_procedure_type
@@ -1426,11 +1472,11 @@ feature -- Kernel types
 		do
 			l_name := tokens.procedure_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
-				-- "PROCEDURE [like Current]"
+			l_master_class.set_marked (True)
+				-- "[attached] PROCEDURE [identity]"
 			create l_parameters.make_with_capacity (1)
-			l_parameters.put_first (tokens.like_current)
-			create procedure_like_current_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
+			l_parameters.put_first (tokens.identity_type)
+			create procedure_identity_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
 		end
 
 	set_real_type
@@ -1441,7 +1487,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.real_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create real_type.make (Void, l_name, l_master_class)
 		end
 
@@ -1454,7 +1500,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.real_32_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create real_32_type.make (Void, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create real_32_convert_feature.make (real_32_type)
@@ -1469,7 +1515,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.real_64_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create real_64_type.make (Void, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create real_64_convert_feature.make (real_64_type)
@@ -1484,10 +1530,10 @@ feature -- Kernel types
 		do
 			l_name := tokens.routine_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create l_parameters.make_with_capacity (1)
-			l_parameters.put_first (tuple_type)
-			create routine_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
+			l_parameters.put_first (tokens.identity_type)
+			create routine_identity_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
 		end
 
 	set_special_type
@@ -1499,15 +1545,19 @@ feature -- Kernel types
 		do
 			l_name := tokens.special_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
-				-- Type "SPECIAL [ANY]".
+			l_master_class.set_marked (True)
+				-- Type "[attached] SPECIAL [[attached] ANY]".
 			create l_parameters.make_with_capacity (1)
 			l_parameters.put_first (any_type)
 			create special_any_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
-				-- Type "SPECIAL [detachable ANY]".
+				-- Type "[attached] SPECIAL [detachable ANY]".
 			create l_parameters.make_with_capacity (1)
 			l_parameters.put_first (detachable_any_type)
 			create special_detachable_any_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
+				-- Type "[attached] SPECIAL [identity]".
+			create l_parameters.make_with_capacity (1)
+			l_parameters.put_first (tokens.identity_type)
+			create special_identity_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
 		end
 
 	set_string_type
@@ -1518,7 +1568,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.string_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create string_type.make (tokens.implicit_attached_type_mark, l_name, l_master_class)
 			create detachable_string_type.make (tokens.detachable_keyword, l_name, l_master_class)
 		end
@@ -1532,7 +1582,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.string_8_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create string_8_type.make (tokens.implicit_attached_type_mark, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create string_8_convert_feature.make (string_8_type)
@@ -1547,7 +1597,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.string_32_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create string_32_type.make (tokens.implicit_attached_type_mark, l_name, l_master_class)
 				-- Built-in conversion feature.
 			create string_32_convert_feature.make (string_32_type)
@@ -1562,7 +1612,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.system_object_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create system_object_type.make (tokens.implicit_attached_type_mark, l_name, l_master_class)
 				-- Implicit parent "SYSTEM_OBJECT".
 			create l_parent.make (system_object_type, Void, Void, Void, Void, Void)
@@ -1578,7 +1628,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.system_string_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create system_string_type.make (tokens.implicit_attached_type_mark, l_name, l_master_class)
 		end
 
@@ -1591,16 +1641,16 @@ feature -- Kernel types
 		do
 			l_name := tokens.tuple_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
-				-- "TUPLE"
+			l_master_class.set_marked (True)
+				-- "[attached] TUPLE"
 			create tuple_type.make (tokens.implicit_attached_type_mark, Void, l_master_class)
 				-- "detachable TUPLE"
 			create detachable_tuple_type.make (tokens.detachable_keyword, Void, l_master_class)
-				-- "TUPLE [like Current]"
+				-- "[attached] TUPLE [identity]"
 			create l_parameters.make_with_capacity (1)
-			l_parameters.put_first (tokens.like_current)
-			create tuple_like_current_type.make (tokens.implicit_attached_type_mark, l_parameters, l_master_class)
-				-- "[TUPLE]"
+			l_parameters.put_first (tokens.identity_type)
+			create tuple_identity_type.make (tokens.implicit_attached_type_mark, l_parameters, l_master_class)
+				-- "[[attached] TUPLE]"
 			create {ET_UNFOLDED_EMPTY_TUPLE_ACTUAL_PARAMETERS} unfolded_empty_tuple_actual_parameters.make (tuple_type)
 		end
 
@@ -1613,37 +1663,27 @@ feature -- Kernel types
 		do
 			l_name := tokens.type_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
-				-- "TYPE [ANY]"
-			create l_parameters.make_with_capacity (1)
-			l_parameters.put_first (any_type)
-			create type_any_type.make_generic (Void, l_name, l_parameters, l_master_class)
-				-- "TYPE [TYPE [ANY]]"
-			create l_parameters.make_with_capacity (1)
-			l_parameters.put_first (type_any_type)
-			create type_type_any_type.make_generic (Void, l_name, l_parameters, l_master_class)
-				-- "TYPE [detachable ANY]"
+			l_master_class.set_marked (True)
+				-- "[attached] TYPE [detachable ANY]"
 			create l_parameters.make_with_capacity (1)
 			l_parameters.put_first (detachable_any_type)
-			create type_detachable_any_type.make_generic (Void, l_name, l_parameters, l_master_class)
-				-- "detachable TYPE [detachable ANY]"
-			create detachable_type_detachable_any_type.make_generic (tokens.detachable_keyword, l_name, l_parameters, l_master_class)
-				-- "TYPE [detachable like Current]"
-			create l_parameters.make_with_capacity (1)
-			l_parameters.put_first (tokens.detachable_like_current)
-			create type_detachable_like_current_type.make_generic (Void, l_name, l_parameters, l_master_class)
-				-- "detachable TYPE [EXCEPTION]"
+			create type_detachable_any_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
+				-- "detachable TYPE [[attached] EXCEPTION]"
 			create l_parameters.make_with_capacity (1)
 			l_parameters.put_first (exception_type)
 			create detachable_type_exception_type.make_generic (tokens.detachable_keyword, l_name, l_parameters, l_master_class)
-				-- "TYPE [detachable EXCEPTION]"
+				-- "[attached] TYPE [detachable EXCEPTION]"
 			create l_parameters.make_with_capacity (1)
 			l_parameters.put_first (detachable_exception_type)
 			create type_detachable_exception_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
-				-- "TYPE [like Current]"
+				-- "[attached] TYPE [detachable like Current]"
 			create l_parameters.make_with_capacity (1)
-			l_parameters.put_first (tokens.like_current)
-			create type_like_current_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
+			l_parameters.put_first (tokens.detachable_like_current)
+			create type_detachable_like_current_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
+				-- "[attached] TYPE [identity]"
+			create l_parameters.make_with_capacity (1)
+			l_parameters.put_first (tokens.identity_type)
+			create type_identity_type.make_generic (tokens.implicit_attached_type_mark, l_name, l_parameters, l_master_class)
 		end
 
 	set_typed_pointer_type
@@ -1655,15 +1695,11 @@ feature -- Kernel types
 		do
 			l_name := tokens.typed_pointer_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
-				-- "TYPED_POINTER [ANY]"
+			l_master_class.set_marked (True)
+				-- "TYPED_POINTER [identity]"
 			create l_parameters.make_with_capacity (1)
-			l_parameters.put_first (any_type)
-			create typed_pointer_any_type.make_generic (Void, l_name, l_parameters, l_master_class)
-				-- "TYPED_POINTER [like Current]"
-			create l_parameters.make_with_capacity (1)
-			l_parameters.put_first (tokens.like_current)
-			create typed_pointer_like_current_type.make_generic (Void, l_name, l_parameters, l_master_class)
+			l_parameters.put_first (tokens.identity_type)
+			create typed_pointer_identity_type.make_generic (Void, l_name, l_parameters, l_master_class)
 		end
 
 	set_wide_character_type
@@ -1674,7 +1710,7 @@ feature -- Kernel types
 		do
 			l_name := tokens.wide_character_class_name
 			l_master_class := master_class (l_name)
-			l_master_class.set_in_system (True)
+			l_master_class.set_marked (True)
 			create wide_character_type.make (Void, l_name, l_master_class)
 		end
 
@@ -1689,17 +1725,17 @@ feature -- Kernel types
 			any_type := tokens.unknown_class_type
 			detachable_any_type := tokens.unknown_class_type
 			detachable_separate_any_type := tokens.unknown_class_type
-			separate_any_type := tokens.unknown_class_type
 			any_parent := tokens.unknown_parent
 			any_parents := tokens.unknown_parents
 			any_clients := tokens.empty_clients
 			tuple_type := tokens.unknown_tuple_type
 			detachable_tuple_type := tokens.unknown_tuple_type
-			tuple_like_current_type := tokens.unknown_tuple_type
+			tuple_identity_type := tokens.unknown_tuple_type
 			unfolded_empty_tuple_actual_parameters := tokens.empty_actual_parameters
 			array_any_type := tokens.unknown_generic_class_type
 			array_detachable_any_type := tokens.unknown_generic_class_type
-			array_like_current_type := tokens.unknown_generic_class_type
+			array_none_type := tokens.unknown_generic_class_type
+			array_identity_type := tokens.unknown_generic_class_type
 			boolean_type := tokens.unknown_class_type
 			character_type := tokens.unknown_class_type
 			character_8_type := tokens.unknown_class_type
@@ -1710,7 +1746,7 @@ feature -- Kernel types
 			exception_type := tokens.unknown_class_type
 			detachable_exception_type := tokens.unknown_class_type
 			exception_manager_type := tokens.unknown_class_type
-			function_type := tokens.unknown_generic_class_type
+			function_identity_any_type := tokens.unknown_generic_class_type
 			immutable_string_32_type := tokens.unknown_class_type
 			integer_type := tokens.unknown_class_type
 			integer_8_type := tokens.unknown_class_type
@@ -1722,7 +1758,7 @@ feature -- Kernel types
 			integer_64_type := tokens.unknown_class_type
 			integer_64_convert_feature := tokens.unknown_convert_feature
 			ise_exception_manager_type := tokens.unknown_class_type
-			iterable_detachable_any_type := tokens.unknown_generic_class_type
+			iterable_detachable_separate_any_type := tokens.unknown_generic_class_type
 			natural_type := tokens.unknown_class_type
 			natural_8_type := tokens.unknown_class_type
 			natural_8_convert_feature := tokens.unknown_convert_feature
@@ -1735,16 +1771,17 @@ feature -- Kernel types
 			none_type := tokens.unknown_class_type
 			detachable_none_type := tokens.unknown_class_type
 			pointer_type := tokens.unknown_class_type
-			predicate_like_current_type := tokens.unknown_generic_class_type
-			procedure_like_current_type := tokens.unknown_generic_class_type
+			predicate_identity_type := tokens.unknown_generic_class_type
+			procedure_identity_type := tokens.unknown_generic_class_type
 			real_type := tokens.unknown_class_type
 			real_32_type := tokens.unknown_class_type
 			real_32_convert_feature := tokens.unknown_convert_feature
 			real_64_type := tokens.unknown_class_type
 			real_64_convert_feature := tokens.unknown_convert_feature
-			routine_type := tokens.unknown_generic_class_type
+			routine_identity_type := tokens.unknown_generic_class_type
 			special_any_type := tokens.unknown_generic_class_type
 			special_detachable_any_type := tokens.unknown_generic_class_type
+			special_identity_type := tokens.unknown_generic_class_type
 			string_type := tokens.unknown_class_type
 			detachable_string_type := tokens.unknown_class_type
 			string_8_type := tokens.unknown_class_type
@@ -1754,16 +1791,12 @@ feature -- Kernel types
 			system_object_type := tokens.unknown_class_type
 			system_object_parents := tokens.unknown_parents
 			system_string_type := tokens.unknown_class_type
-			type_any_type := tokens.unknown_generic_class_type
-			type_type_any_type := tokens.unknown_generic_class_type
 			type_detachable_any_type := tokens.unknown_generic_class_type
-			type_detachable_like_current_type := tokens.unknown_generic_class_type
 			detachable_type_exception_type := tokens.unknown_generic_class_type
 			type_detachable_exception_type := tokens.unknown_generic_class_type
-			detachable_type_detachable_any_type := tokens.unknown_generic_class_type
-			type_like_current_type := tokens.unknown_generic_class_type
-			typed_pointer_any_type := tokens.unknown_generic_class_type
-			typed_pointer_like_current_type := tokens.unknown_generic_class_type
+			type_detachable_like_current_type := tokens.unknown_generic_class_type
+			type_identity_type := tokens.unknown_generic_class_type
+			typed_pointer_identity_type := tokens.unknown_generic_class_type
 			wide_character_type := tokens.unknown_class_type
 		end
 
@@ -1923,17 +1956,9 @@ feature -- Class mapping
 
 feature -- Compilation options
 
-	attachment_type_conformance_mode: BOOLEAN
-			-- Should attachment status be taken into account when checking
-			-- conformance of types in current universe?
-
-	implicit_attachment_type_mark: detachable ET_TYPE_MARK
+	implicit_attachment_type_mark: ET_TYPE_MARK
 			-- Implicit attachment type mark when a type in a class of the
 			-- current universe is declared with no explicit attachment type mark
-
-	target_type_attachment_mode: BOOLEAN
-			-- Should the attachment status of the target of qualified calls
-			-- be checked at compile time?
 
 	obsolete_routine_type_mode: BOOLEAN
 			-- Should the first generic parameter of routine types (ROUTINE, PROCEDURE, FUNCTION, PREDICATE)
@@ -1942,28 +1967,14 @@ feature -- Compilation options
 
 feature -- Compilation options setting
 
-	set_attachment_type_conformance_mode (b: BOOLEAN)
-			-- Set `attachment_type_conformance_mode' to `b'.
-		do
-			attachment_type_conformance_mode := b
-		ensure
-			attachment_type_conformance_mode_set: attachment_type_conformance_mode = b
-		end
-
 	set_implicit_attachment_type_mark (a_type_mark: like implicit_attachment_type_mark)
 			-- Set `implicit_attachment_type_mark' to `a_type_mark'.
+		require
+			a_type_mark_not_void: a_type_mark /= Void
 		do
 			implicit_attachment_type_mark := a_type_mark
 		ensure
 			implicit_attachment_type_mark_set: implicit_attachment_type_mark = a_type_mark
-		end
-
-	set_target_type_attachment_mode (b: BOOLEAN)
-			-- Set `target_type_attachment_mode' to `b'.
-		do
-			target_type_attachment_mode := b
-		ensure
-			target_type_attachment_mode_set: target_type_attachment_mode = b
 		end
 
 	set_obsolete_routine_type_mode (b: BOOLEAN)
@@ -2545,7 +2556,7 @@ feature -- Parsing
 			-- class names and their filenames, and that `master_classes' has been
 			-- populated, even if the classes have not been parsed yet.
 
-	preparse
+	preparse (a_system_processor: ET_SYSTEM_PROCESSOR)
 			-- Build a mapping between class names and their filenames and
 			-- populate `master_classes', even if the classes have not been
 			-- parsed yet. If current universe had already been preparsed,
@@ -2560,13 +2571,15 @@ feature -- Parsing
 			-- The queries `current_system.preparse_*_mode' govern the way
 			-- preparsing works. Read the header comments of these features
 			-- for more details.
+		require
+			a_system_processor_not_void: a_system_processor /= Void
 		do
 			is_preparsed := True
 		ensure
 			preparsed: is_preparsed
 		end
 
-	preparse_recursive
+	preparse_recursive (a_system_processor: ET_SYSTEM_PROCESSOR)
 			-- Build a mapping between class names and their filenames and
 			-- populate `master_classes', even if the classes have not been
 			-- parsed yet. If current universe had already been preparsed,
@@ -2581,14 +2594,16 @@ feature -- Parsing
 			-- The queries `current_system.preparse_*_mode' govern the way
 			-- preparsing works. Read the header comments of these features
 			-- for more details.
+		require
+			a_system_processor_not_void: a_system_processor /= Void
 		do
-			preparse
+			preparse (a_system_processor)
 			import_classes
 		ensure
 			preparsed: is_preparsed
 		end
 
-	parse_all
+	parse_all (a_system_processor: ET_SYSTEM_PROCESSOR)
 			-- Parse all classes declared locally in the current universe.
 			-- There is no need to call one of the preparse routines
 			-- beforehand since the current routine will traverse all
@@ -2606,13 +2621,15 @@ feature -- Parsing
 			-- The queries `current_system.preparse_*_mode' govern the way
 			-- preparsing works. Read the header comments of these features
 			-- for more details.
+		require
+			a_system_processor_not_void: a_system_processor /= Void
 		do
 			is_preparsed := True
 		ensure
 			preparsed: is_preparsed
 		end
 
-	parse_all_recursive
+	parse_all_recursive (a_system_processor: ET_SYSTEM_PROCESSOR)
 			-- Parse all classes declared locally in the current universe,
 			-- and recursively those that are declared in universes it
 			-- depends on. There is no need to call one of the preparse
@@ -2629,8 +2646,10 @@ feature -- Parsing
 			-- The queries `current_system.preparse_*_mode' govern the way
 			-- preparsing works. Read the header comments of these features
 			-- for more details.
+		require
+			a_system_processor_not_void: a_system_processor /= Void
 		do
-			parse_all
+			parse_all (a_system_processor)
 			import_classes
 		ensure
 			preparsed: is_preparsed
@@ -2656,6 +2675,59 @@ feature {NONE} -- Parsing
 			create l_modified.make_false
 			master_classes_do_if_recursive_until (agent any_actions.call ({ET_MASTER_CLASS} ?, agent l_modified.set_true), agent {ET_MASTER_CLASS}.is_modified, agent l_modified.is_true)
 			Result := l_modified.is_true
+		end
+
+feature -- Name clashes
+
+	set_unique_universe_names
+			-- Make sure that current universe and recursively the universes it
+			-- depends on have unique names (case-insensitive).
+			-- Give new names to some universes if needed to resolve name clashes.
+		local
+			l_visited: DS_HASH_SET [ET_UNIVERSE]
+			l_names: DS_HASH_SET [STRING]
+			l_clashes: detachable DS_ARRAYED_LIST [ET_UNIVERSE]
+			l_universe: ET_UNIVERSE
+			l_lower_name: STRING
+			l_new_name: STRING
+			i, nb: INTEGER
+			l_counter: INTEGER
+		do
+			create l_visited.make (initial_universes_capacity)
+			add_universe_recursive (l_visited)
+			create l_names.make_equal (l_visited.count)
+			from l_visited.start until l_visited.after loop
+				l_universe := l_visited.item_for_iteration
+				l_lower_name := l_universe.lower_name
+				if not l_names.has (l_lower_name) then
+					l_names.put_new (l_lower_name)
+				else
+					if l_clashes = Void then
+						create l_clashes.make (l_visited.count - l_names.count)
+					end
+					l_clashes.force_last (l_universe)
+				end
+				l_visited.forth
+			end
+			if l_clashes /= Void then
+				nb := l_clashes.count
+				from i := 1 until i > nb loop
+					l_universe := l_clashes.item (i)
+					l_lower_name := l_universe.lower_name
+					from
+						l_counter := 2
+						l_new_name := l_lower_name + "_" + l_counter.out
+					until
+						not l_names.has (l_new_name)
+					loop
+						l_counter := l_counter + 1
+						l_new_name := l_lower_name + "_" + l_counter.out
+					end
+					l_names.put_new (l_new_name)
+					l_universe.set_name (l_new_name)
+					i := i + 1
+				end
+			end
 		end
 
 feature {NONE} -- Constants
@@ -2696,35 +2768,43 @@ feature {NONE} -- Implementation
 			a_hash_table.force_last (a_value, a_key)
 		end
 
+feature {NONE} -- Concurrency
+
+	master_class_mutex: MUTEX
+			-- Mutex to call `master_class'
+
 invariant
 
 	current_system_not_void: current_system /= Void
+	universe_is_current: universe = Current
 	master_classes_not_void: master_classes /= Void
 	no_void_master_class: not master_classes.has_void_item
+	implicit_attachment_type_mark_not_void: implicit_attachment_type_mark /= Void
 		-- Kernel types.
 	any_type_not_void: any_type /= Void
 	detachable_any_type_not_void: detachable_any_type /= Void
 	detachable_separate_any_type_not_void: detachable_separate_any_type /= Void
-	separate_any_type_not_void: separate_any_type /= Void
 	any_parent_not_void: any_parent /= Void
 	any_parents_not_void: any_parents /= Void
 	any_clients_not_void: any_clients /= Void
 	array_any_type_not_void: array_any_type /= Void
 	array_detachable_any_type_not_void: array_detachable_any_type /= Void
-	array_like_current_type_not_void: array_like_current_type /= Void
+	array_none_type_not_void: array_none_type /= Void
+	array_identity_type_not_void: array_identity_type /= Void
+	boolean_type_not_void: boolean_type /= Void
 	character_8_type_not_void: character_8_type /= Void
 	character_32_type_not_void: character_32_type /= Void
 	exception_type_not_void: detachable_exception_type /= Void
 	detachable_exception_type_not_void: exception_type /= Void
 	exception_manager_type_not_void: exception_manager_type /= Void
-	function_type_not_void: function_type /= Void
+	function_identity_any_type_not_void: function_identity_any_type /= Void
 	immutable_string_32_type_not_void: immutable_string_32_type /= Void
 	integer_8_type_not_void: integer_8_type /= Void
 	integer_16_type_not_void: integer_16_type /= Void
 	integer_32_type_not_void: integer_32_type /= Void
 	integer_64_type_not_void: integer_64_type /= Void
 	ise_exception_manager_type_not_void: ise_exception_manager_type /= Void
-	iterable_detachable_any_type_not_void: iterable_detachable_any_type /= Void
+	iterable_detachable_separate_any_type_not_void: iterable_detachable_separate_any_type /= Void
 	natural_8_type_not_void: natural_8_type /= Void
 	natural_16_type_not_void: natural_16_type /= Void
 	natural_32_type_not_void: natural_32_type /= Void
@@ -2732,13 +2812,14 @@ invariant
 	none_type_not_void: none_type /= Void
 	detachable_none_type_not_void: detachable_none_type /= Void
 	pointer_type_not_void: pointer_type /= Void
-	predicate_like_current_type_not_void: predicate_like_current_type /= Void
-	procedure_like_current_type_not_void: procedure_like_current_type /= Void
+	predicate_identity_type_not_void: predicate_identity_type /= Void
+	procedure_identity_type_not_void: procedure_identity_type /= Void
 	real_32_type_not_void: real_32_type /= Void
 	real_64_type_not_void: real_64_type /= Void
-	routine_type_not_void: routine_type /= Void
+	routine_identity_type_not_void: routine_identity_type /= Void
 	special_any_type_not_void: special_any_type /= Void
 	special_detachable_any_type_not_void: special_detachable_any_type /= Void
+	special_identity_type_not_void: special_identity_type /= Void
 	string_8_type_not_void: string_8_type /= Void
 	string_32_type_not_void: string_32_type /= Void
 	system_object_type_not_void: system_object_type /= Void
@@ -2746,20 +2827,15 @@ invariant
 	system_string_type_not_void: system_string_type /= Void
 	tuple_type_not_void: tuple_type /= Void
 	detachable_tuple_type_not_void: detachable_tuple_type /= Void
-	tuple_like_current_type_not_void: tuple_like_current_type /= Void
+	tuple_identity_type_not_void: tuple_identity_type /= Void
 	tuple_actual_parameters_not_void: unfolded_empty_tuple_actual_parameters /= Void
-	type_any_type_not_void: type_any_type /= Void
-	type_type_any_type_not_void: type_type_any_type /= Void
 	type_detachable_any_type_not_void: type_detachable_any_type /= Void
-	type_detachable_like_current_type_not_void: type_detachable_like_current_type /= Void
 	detachable_type_exception_type_not_void: detachable_type_exception_type /= Void
 	type_detachable_exception_type_not_void: type_detachable_exception_type /= Void
-	detachable_type_detachable_any_type_not_void: detachable_type_detachable_any_type /= Void
-	type_like_currenttype_not_void: type_like_current_type /= Void
-	typed_pointer_any_type_not_void: typed_pointer_any_type /= Void
-	typed_pointer_like_current_type_not_void: typed_pointer_like_current_type /= Void
+	type_detachable_like_current_type_not_void: type_detachable_like_current_type /= Void
+	type_identity_type_not_void: type_identity_type /= Void
+	typed_pointer_identity_type_not_void: typed_pointer_identity_type /= Void
 		-- Class mapping.
-	boolean_type_not_void: boolean_type /= Void
 	character_type_not_void: character_type /= Void
 	double_type_not_void: double_type /= Void
 	integer_type_not_void: integer_type /= Void
@@ -2783,5 +2859,7 @@ invariant
 	real_64_convert_feature_not_void: real_64_convert_feature /= Void
 	string_8_convert_feature_not_void: string_8_convert_feature /= Void
 	string_32_convert_feature_not_void: string_32_convert_feature /= Void
+		-- Concurrency.
+	master_class_mutex_not_void: master_class_mutex /= Void
 
 end

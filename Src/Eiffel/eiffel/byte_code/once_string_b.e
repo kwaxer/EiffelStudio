@@ -1,4 +1,4 @@
-note
+﻿note
 
 	description: "Byte code for once manifest string (pre-allocated)."
 	legal: "See notice at end of class."
@@ -26,7 +26,7 @@ create {INTERNAL_COMPILER_STRING_EXPORTER}
 
 feature {NONE} -- Initialization
 
-	make (v: STRING; a_str32: BOOLEAN; n: INTEGER)
+	make (v: STRING; a_str32: BOOLEAN; a_is_immutable: BOOLEAN; n: INTEGER)
 			-- Create object for `n'-th once manifest string with value `v'.
 		require
 			v_not_void: v /= Void
@@ -35,6 +35,7 @@ feature {NONE} -- Initialization
 			value := v
 			number := n
 			is_string_32 := a_str32
+			is_immutable := a_is_immutable
 		ensure
 			value_set: value = v
 			number_set: number = n
@@ -51,6 +52,9 @@ feature -- Access
 
 	is_string_32: BOOLEAN
 			-- Is current a STRING_32 manifest string?
+
+	is_immutable: BOOLEAN
+			-- Is the IMMUTABLE_ variant of string?			
 
 feature {INTERNAL_COMPILER_STRING_EXPORTER} -- Access
 
@@ -95,16 +99,24 @@ feature -- Properties
 			if is_dotnet_string then
 				Result := system_string_type
 			elseif not is_string_32 then
-				Result := string_type
+				if is_immutable then
+					Result := immutable_string_type
+				else
+					Result := string_type
+				end
 			else
-				Result := string_32_type
+				if is_immutable then
+					Result := immutable_string_32_type
+				else
+					Result := string_32_type
+				end
 			end
 		end
 
 	enlarged: ONCE_STRING_BL
 			-- Enlarge node
 		do
-			create Result.make (value, is_string_32, number)
+			create Result.make (value, is_string_32, is_immutable, number)
 		end
 
 	used (r: REGISTRABLE): BOOLEAN
@@ -126,7 +138,7 @@ feature -- Properties
 		do
 				-- Inlining will not be done for once string as they need to
 				-- be generated in the context of the feature were they are defined.
-			Result := 101	-- equal to maximum size of inlining + 1 (Found in FREE_OPTION_SD)
+			Result := {LACE_I}.inlining_threshold
 		end
 
 feature -- Settings
@@ -157,6 +169,22 @@ feature {NONE} -- Implementation: types
 			string_type_not_void: Result /= Void
 		end
 
+	immutable_string_type: CL_TYPE_A
+			-- Type of IMMUTABLE_STRING_8.
+		once
+			create Result.make (System.immutable_string_8_id)
+		ensure
+			immutable_string_type_not_void: Result /= Void
+		end
+
+	immutable_string_32_type: CL_TYPE_A
+			-- Type of IMMUTABLE_STRING_32.
+		once
+			create Result.make (System.immutable_string_32_id)
+		ensure
+			immutable_string_type_not_void: Result /= Void
+		end
+
 	system_string_type: CL_TYPE_A
 			-- Type of SYSTEM_STRING
 		require
@@ -179,7 +207,7 @@ invariant
 	value_not_void: value /= Void
 
 note
-	copyright:	"Copyright (c) 1984-2017, Eiffel Software"
+	copyright:	"Copyright (c) 1984-2019, Eiffel Software"
 	license:	"GPL version 2 (see http://www.eiffel.com/licensing/gpl.txt)"
 	licensing_options:	"http://www.eiffel.com/licensing"
 	copying: "[
