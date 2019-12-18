@@ -314,8 +314,18 @@ BREAK	{HORIZONAL_BREAK}|\n
 \xE2\x9F\xB3 {
 				update_character_locations
 				if syntax_version /= obsolete_syntax then
-					last_symbol_id_value := ast_factory.new_symbol_id_as (TE_REPEAT, Current)
-					last_token := TE_REPEAT
+					last_symbol_id_value := ast_factory.new_symbol_id_as (TE_REPEAT_OPEN, Current)
+					last_token := TE_REPEAT_OPEN
+				else
+					process_id_as
+					last_token := TE_FREE
+				end
+			}
+\xE2\x9F\xB2 {
+				update_character_locations
+				if syntax_version /= obsolete_syntax then
+					last_symbol_id_value := ast_factory.new_symbol_id_as (TE_REPEAT_CLOSE, Current)
+					last_token := TE_REPEAT_CLOSE
 				else
 					process_id_as
 					last_token := TE_FREE
@@ -567,11 +577,6 @@ BREAK	{HORIZONAL_BREAK}|\n
 
 				end
 			}
-[iI][nN][fF][iI][xX]	{
-				update_character_locations
-				last_detachable_keyword_as_value := ast_factory.new_infix_keyword_as (Current)
-				last_token := TE_INFIX
-			}
 [iI][nN][hH][eE][rR][iI][tT]	{
 				update_character_locations
 				last_detachable_keyword_as_value := ast_factory.new_keyword_as (TE_INHERIT, Current)
@@ -693,11 +698,6 @@ BREAK	{HORIZONAL_BREAK}|\n
 				update_character_locations
 				last_detachable_keyword_as_value := ast_factory.new_precursor_keyword_as (Current)
 				last_token := TE_PRECURSOR
-			}
-[pP][rR][eE][fF][iI][xX]	{
-				update_character_locations
-				last_detachable_keyword_as_value := ast_factory.new_prefix_keyword_as (Current)
-				last_token := TE_PREFIX
 			}
 [rR][eE][dD][eE][fF][iI][nN][eE]	{
 				update_character_locations
