@@ -257,7 +257,7 @@ test	external-tab-after-macro	syntax031 tcf pass syntax
 test	external-proc-sig-return-type	syntax032 tcf pass syntax
 test	point-e-one-real-constant	syntax033 tcf pass syntax
 test	qualified-call-e-forty-seven	syntax034 tcf pass syntax
-test	infix-pass-feature-address	syntax035 tcf pass syntax
+test	alias-pass-feature-address	syntax035 tcf pass syntax
 test	assign-addr-expr-to-pointer	syntax036 tcf fail syntax
 test	cast-arg-type-with-parens	syntax037 tcf fail syntax
 test	bogus-string-syntax-error	syntax038 tcf pass syntax
@@ -578,12 +578,12 @@ test	missing-vjar-error			valid284 tcf pass validity anchored_type system-validi
 test	missing-vjar-error-2		valid285 tcf pass validity anchored_type system-validity
 test	parenthesis-alias-tuple-vuar	valid286 tcf pass validity parenthesis_alias conversion tuple conformance
 test	conversion-on-separate-target	valid287 tcf fail validity conversion scoop
-test	wrong-type-for-manifest-array-in-across	valid288 tcf pass validity manifest-array across
+test	wrong-type-for-manifest-array-in-across	valid288 tcf pass validity manifest_array across
 test	obsolete-feature-call-with-body	valid289 tcf pass validity warning attribute obsolete_call
 test	obsolete-assigner-query		valid290 tcf pass validity warning obsolete_call
 test	obsolete-assigner-command	valid291 tcf pass validity warning obsolete_call
-test	typed-manifest-array-item-validity	valid292 tcf pass validity manifest array
-test	typed-manifest-array-type-validity	valid293 tcf pass validity manifest array
+test	typed-manifest-array-item-validity	valid292 tcf pass validity manifest_array
+test	typed-manifest-array-type-validity	valid293 tcf pass validity manifest_array
 test	identifier-scope-validity		valid294 tcf pass validity scope argument local object_test separate iteration agent
 test	identifier-scope-validity-recompilation	valid295 tcf pass validity scope argument local object_test separate iteration agent incrementality
 test	obsolete-feature-call-date	valid296 tcf pass validity warning obsolete_call
@@ -1107,7 +1107,7 @@ test 	finalization-with-error-crash	incr426	tcf fail incrementality agents final
 test 	create-generic-remove-generic-inheritance incr427 tcf fail incrementality generic
 test	config-remove-library-indirectly	incr428 tcf fail incrementality config
 test	ececil-undefined-symbol-4	incr429	tcf fail incrementality
-test	qat-vwce-sneak			incr430	tcf fail incrementality anchored_type conditional expression
+test	qat-vwce-sneak			incr430	tcf pass incrementality anchored_type conditional expression
 test	unique-recompile-crash	incr431	tcf pass incrementality
 test	infinite-recursion-scoop-recompile	incr432	tcf pass incrementality scoop
 test	attribute-removal-addition-execution-crash	incr433	tcf fail incrementality
@@ -1876,15 +1876,15 @@ test	void-safe-like-argument		exec364 tcf pass execution attached_types anchored
 test	once-manifest-string-extended-ascii exec365 tcf pass execution
 test	ieee-nan-deep-comparison	exec366 tcf pass execution ieee
 test	types-and-attachement 		exec367 tcf pass execution conformance void_safe
-test	manifest-array-type-computation	exec368 tcf pass execution manifest array
+test	manifest-array-type-computation	exec368 tcf pass execution manifest_array
 test	conditional-expression-type-computation	exec369 tcf pass execution conditional expression
 test	conditional-expression-expanded-type	exec370 tcf pass execution conditional expression
 test	old-expression-in-feature-body		exec371 tcf fail execution old expression
-test	target-manifest-array-type-computation	exec372 tcf pass execution manifest array
+test	target-manifest-array-type-computation	exec372 tcf pass execution manifest_array
 test	type-with-none				exec373	tcf pass execution conformance
 test	floating-point-comparison		exec374 tcf pass execution ieee
 test	anchored-tuple-creation			exec375 tcf pass execution creation anchored_type tuple
-test	manifest-array-of-qualified-types	exec376 tcf pass execution manifest array
+test	manifest-array-of-qualified-types	exec376 tcf pass execution manifest_array
 
 -- Once specific
 
@@ -1911,17 +1911,6 @@ test once-per-object-nonconforming-2		once020 tcf fail once non-conforming
 test once-per-object-generic-precursor		once021 tcf pass once
 test once-per-object-array-of-expanded		once022 tcf fail once
 test once-per-object-inherited-twice		once023 tcf fail once
-
-
--- Once creation procedures
-
-test once-per-thread-creation-procedure     once024 tcf fail once 
-test once-creation-procedures-immediate     once025 tcf fail once 
-test once-creation-procedures-generic       once026 tcf fail once 
-test once-creation-procedures-not-qualified-call once027 tcf fail once 
-test once-creation-procedures-qualified-call once028 tcf fail once 
-test once-creation-procedures-creation-call once029 tcf fail once 
-test once-creation-procedures-creation-invalid-call once030 tcf fail once 
 
 -- Compiler termination (exception trace, panic, etc.)
 
@@ -2124,7 +2113,7 @@ test	qat-greater-number-of-formal	term214 tcf pass validity anchored_type system
 test	large-integer-64-crash			term215 tcf pass syntax
 test	conversion-by-constant-attribute	term216 tcf pass termination conversion
 test	generic-assignment-to-tuple-field	term217 tcf pass termination tuple assigner
-test	sequence-type-computation-hanging	term218	tcf fail manual manifest array conditional expression
+test	sequence-type-computation-hanging	term218	tcf pass manifest_array conditional expression
 
 -- Config
 
@@ -2994,7 +2983,7 @@ test	reflector-new_instance_of-marks		reflection010 tcf pass reflection creation
 test	qat-evaluation-order			anchor001 tcf pass anchored_type
 test	qat-redeclaration-check			anchor002 tcf pass anchored_type redeclaration validity conformance incrementality
 test	inherited-qat-failure			anchor003 tcf pass anchored_type system-validity
-test	delayed-check-failure-with-infix	anchor004 tcf pass anchored_type termination
+test	delayed-check-failure-with-alias	anchor004 tcf pass anchored_type termination
 test	qat-creation-with-deferred              anchor005 tcf pass anchored_type creation execution
 test	qat-creation-with-like-current		anchor006 tcf pass anchored_type creation execution
 test	qat-creation-with-generic		anchor007 tcf pass anchored_type creation execution formal generic stable attribute
@@ -3126,7 +3115,7 @@ test	pretty-feature-call-comment		pretty027 tcf pass pretty
 test	pretty-comments-between-features	pretty028 tcf pass pretty
 test	pretty-loop-invariant			pretty029 tcf pass pretty
 test	pretty-inline-separate-instruction	pretty030 tcf pass pretty
-test	pretty-manifest-array			pretty031 tcf pass pretty manifest array
+test	pretty-manifest-array			pretty031 tcf pass pretty manifest_array
 test	pretty-across-loop			pretty032 tcf pass pretty across iteration loop
 
 -- Benchmarks
